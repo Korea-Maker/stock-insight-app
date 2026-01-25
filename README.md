@@ -1,143 +1,50 @@
-# QuantBoard V1
+# Stock Insight App
 
-> 고성능 실시간 암호화폐 트레이딩 대시보드
+> AI 기반 주식 딥리서치 분석 애플리케이션
 >
-> High-Performance Real-Time Cryptocurrency Trading Dashboard
+> AI-Powered Stock Deep Research Analysis Application
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Next.js](https://img.shields.io/badge/Next.js-16-black)](https://nextjs.org/)
+[![Next.js](https://img.shields.io/badge/Next.js-15-black)](https://nextjs.org/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.115+-009688)](https://fastapi.tiangolo.com/)
 [![Python](https://img.shields.io/badge/Python-3.11+-blue)](https://www.python.org/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5-blue)](https://www.typescriptlang.org/)
-
-**[한국어 문서](./README.ko.md)** | **[Documentation](./docs/)**
 
 ---
 
 ## Overview
 
-QuantBoard V1 is a professional-grade real-time trading dashboard that aggregates live cryptocurrency market data from Binance and cryptocurrency news from multiple sources. Built with modern asynchronous architecture, it delivers real-time price streams via WebSocket and historical data through REST APIs.
+Stock Insight App은 AI를 활용한 주식 딥리서치 분석 애플리케이션입니다. 종목코드 또는 회사명을 입력하고 투자 기간을 선택하면 AI가 종합적인 투자 분석 보고서를 생성합니다.
 
 ### Key Features
 
-- **Real-Time Price Streaming**: WebSocket-based live price updates with Redis Pub/Sub
-- **Advanced Trading Charts**: 14+ technical indicators (MA, RSI, MACD, Ichimoku, Bollinger Bands, etc.)
-- **Historical Market Data**: Binance candle data (OHLC) with flexible intervals
-- **Cryptocurrency News**: Automated collection and translation from major crypto news sources
-- **Community Platform**: Post creation, comments (nested replies), likes, and user profiles
-- **User Authentication**: JWT-based auth with OAuth support (Google, GitHub)
-- **High Performance**: Async Python backend + React 19 frontend with optimistic updates
-- **Flexible Deployment**: Optional Redis mode - works with or without real-time streaming
-- **Dark Theme Support**: Built-in dark mode for comfortable trading
-
----
-
-## Table of Contents
-
-- [Tech Stack](#tech-stack)
-- [Architecture](#architecture)
-- [Quick Start](#quick-start)
-- [API Documentation](#api-documentation)
-- [Project Structure](#project-structure)
-- [Environment Configuration](#environment-configuration)
-- [Development](#development)
-- [Deployment](#deployment)
-- [Contributing](#contributing)
-- [License](#license)
+- **종목 검색 및 자동완성**: Finnhub API 기반 실시간 종목 검색
+- **투자 기간 선택**: 단기(1-3개월), 중기(3-12개월), 장기(1년+)
+- **AI 딥리서치 분석**: OpenAI GPT-4 기반 종합 투자 분석
+- **투자 의사결정**: 적극매입/매입/홀드/매도/적극매도 추천
+- **위험도 평가**: 1-10점 스케일의 위험도 분석
+- **시장 심리 분석**: Bullish/Neutral/Bearish 판단
+- **분석 히스토리**: 이전 분석 결과 저장 및 조회
+- **다크/라이트 테마**: 사용자 선호에 따른 테마 전환
 
 ---
 
 ## Tech Stack
 
 ### Frontend
-- **Framework**: Next.js 16 (App Router), React 19
+- **Framework**: Next.js 15 (App Router), React 19
 - **Language**: TypeScript 5
 - **Styling**: Tailwind CSS 4, shadcn/ui
-- **Charting**: lightweight-charts
-- **State Management**: Zustand (Redux-free)
+- **State Management**: Zustand
 - **Icons**: lucide-react
-- **Animation**: framer-motion
+- **Date**: date-fns
 
 ### Backend
 - **Framework**: FastAPI (Async)
 - **Language**: Python 3.11+
-- **WebSocket**: websockets, FastAPI WebSocket support
-- **Database**: PostgreSQL with SQLAlchemy (AsyncSession)
-- **Caching**: Redis (optional)
-- **HTTP Client**: httpx, aiohttp
-- **News Processing**: feedparser, beautifulsoup4, deep-translator
-
-### Infrastructure
-- **Containerization**: Docker Compose
-- **Database**: PostgreSQL 15+
-- **Cache**: Redis 7+ (optional)
-- **Web Server**: Uvicorn (ASGI)
-
----
-
-## Architecture
-
-### System Overview
-
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                         Client Browser                           │
-│  ┌────────────┐  ┌────────────┐  ┌────────────┐                │
-│  │   Chart    │  │ Dashboard  │  │    News    │                │
-│  └────────────┘  └────────────┘  └────────────┘                │
-└───────────────┬─────────────────────────────┬───────────────────┘
-                │ WebSocket (/ws/prices)      │ REST API
-                │                             │ (/api/*)
-┌───────────────▼─────────────────────────────▼───────────────────┐
-│                      FastAPI Backend                            │
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐         │
-│  │ WebSocket    │  │ Candles API  │  │   News API   │         │
-│  │  Handler     │  │   (REST)     │  │   (REST)     │         │
-│  └──────┬───────┘  └──────┬───────┘  └──────┬───────┘         │
-│         │                 │                  │                  │
-│  ┌──────▼───────┐  ┌──────▼───────┐  ┌──────▼───────┐         │
-│  │ConnectionMgr │  │Binance REST  │  │ PostgreSQL   │         │
-│  │(broadcast)   │  │   Client     │  │   (News DB)  │         │
-│  └──────┬───────┘  └──────────────┘  └──────────────┘         │
-│         │                                                        │
-│  ┌──────▼───────┐                                               │
-│  │ Redis Pub/Sub│◄──────────────────────┐                      │
-│  └──────────────┘                       │                      │
-└─────────────────────────────────────────┼──────────────────────┘
-                                          │
-┌─────────────────────────────────────────▼──────────────────────┐
-│                    Background Services                          │
-│  ┌────────────────────────┐  ┌────────────────────────┐        │
-│  │  Binance Ingestor      │  │   News Collector       │        │
-│  │  (WebSocket Stream)    │  │   (RSS Feeds)          │        │
-│  │  BTCUSDT, ETHUSDT, ... │  │   CoinDesk, Cointele.. │        │
-│  └────────┬───────────────┘  └────────┬───────────────┘        │
-│           │ Publish              │ Store                       │
-│           └──────────────────────┘                              │
-└─────────────────────────────────────────────────────────────────┘
-```
-
-### Data Flow
-
-#### 1. Real-Time Price Stream (Redis Required)
-```
-Binance WebSocket → BinanceIngestor → Redis Pub/Sub (live_prices)
-  → ConnectionManager → WebSocket Clients → Zustand Store → UI Update
-```
-
-#### 2. Historical Candles (REST)
-```
-Client Request → FastAPI (/api/candles) → Binance REST API
-  → Data Normalization → JSON Response → Chart Rendering
-```
-
-#### 3. News Collection & Delivery
-```
-RSS Feeds → NewsCollector → PostgreSQL (News Table)
-Client Request → FastAPI (/api/news) → PostgreSQL Query → JSON Response
-```
-
-**For detailed architecture, see [docs/architecture/SYSTEM_DESIGN.md](./docs/architecture/SYSTEM_DESIGN.md)**
+- **Database**: SQLite (SQLAlchemy)
+- **AI**: OpenAI GPT-4o-mini (기본), Anthropic Claude (폴백)
+- **Stock Data**: Finnhub API
 
 ---
 
@@ -145,16 +52,16 @@ Client Request → FastAPI (/api/news) → PostgreSQL Query → JSON Response
 
 ### Prerequisites
 
-- **Node.js** 18+ and npm
+- **Node.js** 18+
 - **Python** 3.11+
-- **Docker** and Docker Compose
-- **Git**
+- **Finnhub API Key** (무료: https://finnhub.io/)
+- **OpenAI API Key** (https://platform.openai.com/)
 
 ### 1. Clone the Repository
 
 ```bash
-git clone <repository-url>
-cd market-insight-agent
+git clone https://github.com/Korea-Maker/stock-insight-app.git
+cd stock-insight-app
 ```
 
 ### 2. Backend Setup
@@ -174,31 +81,18 @@ source venv/bin/activate
 # Install dependencies
 pip install -r requirements.txt
 
-# Copy environment file and configure
+# Create .env file
 cp env.example .env
-# Edit .env file with your settings
 
-# Start infrastructure (Redis & PostgreSQL)
-docker-compose up -d
+# Edit .env with your API keys
+# FINNHUB_API=your_finnhub_api_key
+# OPENAI_API_KEY=your_openai_api_key
 
-# Run database migrations (automatic on startup)
-# Tables will be created automatically
-
-# Start the backend server
+# Start the server
 python main.py
 ```
 
-Backend will be available at `http://localhost:8000`
-
-**Health Check:**
-```bash
-curl http://localhost:8000/health
-```
-
-**API Documentation (Swagger UI):**
-```
-http://localhost:8000/docs
-```
+Backend: http://localhost:8000
 
 ### 3. Frontend Setup
 
@@ -212,549 +106,212 @@ npm install
 npm run dev
 ```
 
-Frontend will be available at `http://localhost:3000`
-
-### 4. Enable Real-Time Features (Optional)
-
-By default, Redis is disabled. To enable real-time price streaming:
-
-```bash
-# In backend/.env
-REDIS_ENABLED=true
-
-# Restart backend
-cd backend
-python main.py
-```
+Frontend: http://localhost:3000
 
 ---
 
-## API Documentation
+## API Endpoints
 
-### REST Endpoints
+### Analysis API
 
-#### Health Check
+```http
+# 주식 분석 실행
+POST /api/analysis/stock
+Content-Type: application/json
+{
+  "stock_code": "AAPL",
+  "timeframe": "mid"
+}
+
+# 분석 히스토리 조회
+GET /api/analysis/history?limit=10
+
+# 특정 분석 결과 조회
+GET /api/analysis/{id}
+
+# 종목 검색
+GET /api/analysis/search?q=apple
+```
+
+### Health Check
+
 ```http
 GET /health
 ```
-
-**Response:**
-```json
-{
-  "status": "healthy",
-  "service": "QuantBoard API"
-}
-```
-
-#### Get Candle Data
-```http
-GET /api/candles?symbol=BTCUSDT&interval=1m&limit=500
-```
-
-**Parameters:**
-- `symbol` (string): Trading pair (e.g., BTCUSDT, ETHUSDT)
-- `interval` (string): Time interval (1m, 5m, 15m, 1h, 4h, 1d, etc.)
-- `limit` (integer): Number of candles (1-1000, default: 500)
-- `end_time` (integer, optional): End time in Unix milliseconds
-
-**Response:**
-```json
-{
-  "symbol": "BTCUSDT",
-  "interval": "1m",
-  "candles": [
-    {
-      "time": 1704067200,
-      "open": 42500.50,
-      "high": 42550.00,
-      "low": 42480.00,
-      "close": 42520.30,
-      "volume": 125.45
-    }
-  ]
-}
-```
-
-#### Get News List
-```http
-GET /api/news?skip=0&limit=20&source=CoinDesk
-```
-
-**Parameters:**
-- `skip` (integer): Number of items to skip (pagination)
-- `limit` (integer): Number of items to return (1-100)
-- `source` (string, optional): Filter by news source
-
-**Response:**
-```json
-{
-  "total": 150,
-  "items": [
-    {
-      "id": 1,
-      "title": "Bitcoin Reaches New All-Time High",
-      "title_kr": "비트코인, 사상 최고치 경신",
-      "link": "https://...",
-      "published": "2024-01-15T10:30:00Z",
-      "source": "CoinDesk",
-      "description": "...",
-      "created_at": "2024-01-15T10:35:00Z"
-    }
-  ]
-}
-```
-
-#### Get News Sources
-```http
-GET /api/news/sources
-```
-
-**Response:**
-```json
-["CoinDesk", "CoinTelegraph", "Bitcoin.com"]
-```
-
-#### Get News by ID
-```http
-GET /api/news/{news_id}
-```
-
-### Authentication API
-
-#### Register
-```http
-POST /api/auth/register
-```
-
-**Request Body:**
-```json
-{
-  "email": "user@example.com",
-  "username": "username",
-  "password": "password123",
-  "display_name": "User Name"
-}
-```
-
-#### Login
-```http
-POST /api/auth/login
-```
-
-**Request Body:**
-```json
-{
-  "email": "user@example.com",
-  "password": "password123"
-}
-```
-
-**Response:**
-```json
-{
-  "access_token": "eyJhbGciOiJIUzI1NiIs...",
-  "refresh_token": "eyJhbGciOiJIUzI1NiIs...",
-  "token_type": "bearer",
-  "expires_in": 900,
-  "user": { ... }
-}
-```
-
-### Community API
-
-#### Get Posts
-```http
-GET /api/posts?skip=0&limit=20&category=tech&sort=latest
-```
-
-**Parameters:**
-- `skip` (integer): Number of items to skip
-- `limit` (integer): Number of items to return (1-100)
-- `category` (string, optional): Filter by category
-- `tag` (string, optional): Filter by tag
-- `sort` (string): Sort by (latest, trending, top)
-- `search` (string, optional): Search in title/content
-
-#### Create Post (Auth Required)
-```http
-POST /api/posts
-Authorization: Bearer <access_token>
-```
-
-**Request Body:**
-```json
-{
-  "title": "Post Title",
-  "content": "# Markdown content",
-  "category": "tech",
-  "tags": ["bitcoin", "analysis"]
-}
-```
-
-#### Get Comments
-```http
-GET /api/posts/{post_id}/comments
-```
-
-#### Create Comment (Auth Required)
-```http
-POST /api/posts/{post_id}/comments
-Authorization: Bearer <access_token>
-```
-
-**Request Body:**
-```json
-{
-  "content": "Comment content",
-  "parent_id": null
-}
-```
-
-### WebSocket Endpoints
-
-#### Real-Time Prices
-```
-WS /ws/prices
-```
-
-**Connection:**
-```javascript
-const ws = new WebSocket('ws://localhost:8000/ws/prices');
-
-ws.onmessage = (event) => {
-  const data = JSON.parse(event.data);
-  console.log(data);
-  // {
-  //   "symbol": "BTCUSDT",
-  //   "price": 42520.30,
-  //   "timestamp": 1704067200000,
-  //   "volume": 1.25
-  // }
-};
-```
-
-**Note:** Requires `REDIS_ENABLED=true` in backend configuration.
-
-**For complete API reference, see:**
-- [docs/api/README.md](./docs/api/README.md) - Basic API documentation
-- [docs/api/BACKEND_API.md](./docs/api/BACKEND_API.md) - Full API reference (Auth, Community, Sources)
 
 ---
 
 ## Project Structure
 
 ```
-market-insight-agent/
-├── backend/                    # FastAPI Backend
+stock-insight-app/
+├── backend/
 │   ├── app/
-│   │   ├── core/              # Core configurations
-│   │   │   ├── config.py      # Pydantic Settings
-│   │   │   ├── database.py    # SQLAlchemy AsyncEngine
-│   │   │   └── redis.py       # Redis client singleton
-│   │   ├── models/            # Database models
-│   │   │   └── news.py        # News SQLAlchemy model
-│   │   ├── routers/           # API routes
-│   │   │   ├── ws.py          # WebSocket (/ws/prices)
-│   │   │   ├── candles.py     # Candles REST API
-│   │   │   └── news.py        # News REST API
-│   │   └── services/          # Background services
-│   │       ├── ingestor.py    # Binance WebSocket ingestor
-│   │       └── news_collector.py  # News RSS collector
-│   ├── main.py                # FastAPI application entry
-│   ├── requirements.txt       # Python dependencies
-│   ├── docker-compose.yml     # Infrastructure services
-│   └── env.example            # Environment template
+│   │   ├── core/
+│   │   │   ├── config.py          # 환경 설정
+│   │   │   └── database.py        # SQLite 데이터베이스
+│   │   ├── models/
+│   │   │   └── stock_insight.py   # 분석 결과 모델
+│   │   ├── routers/
+│   │   │   └── analysis.py        # 분석 API 라우터
+│   │   ├── schemas/
+│   │   │   └── analysis.py        # Pydantic 스키마
+│   │   └── services/
+│   │       ├── stock_data_service.py    # Finnhub 데이터 서비스
+│   │       ├── stock_insight_engine.py  # AI 분석 엔진
+│   │       ├── prompts.py               # LLM 프롬프트
+│   │       └── response_parser.py       # 응답 파서
+│   ├── main.py
+│   └── requirements.txt
 │
-├── frontend/                  # Next.js Frontend
-│   ├── app/                   # Next.js App Router
-│   │   ├── page.tsx           # Homepage
-│   │   ├── dashboard/         # Dashboard pages
-│   │   └── news/              # News pages
-│   ├── components/            # React components
-│   │   ├── Chart/             # Trading chart (14+ indicators)
-│   │   ├── Dashboard/         # Dashboard components
-│   │   ├── Layout/            # Layout components
-│   │   ├── Navigation/        # Navigation components
-│   │   ├── Auth/              # Authentication (login, register)
-│   │   ├── Community/         # Posts, comments
-│   │   ├── Theme/             # Dark/light theme
-│   │   └── ui/                # shadcn/ui components
-│   ├── hooks/                 # Custom React hooks
-│   │   └── useWebSocket.ts    # WebSocket hook with reconnection
-│   ├── store/                 # Zustand stores
-│   │   ├── usePriceStore.ts   # Real-time price state
-│   │   ├── useChartStore.ts   # Chart settings (14+ indicators)
-│   │   ├── useAuthStore.ts    # Authentication state
-│   │   └── useCommunityStore.ts # Posts & comments state
-│   ├── lib/                   # Utilities
-│   └── package.json           # Node dependencies
+├── frontend/
+│   ├── app/
+│   │   ├── page.tsx               # 메인 페이지
+│   │   ├── dashboard/page.tsx     # 대시보드
+│   │   ├── history/page.tsx       # 히스토리
+│   │   └── analysis/[id]/page.tsx # 분석 상세
+│   ├── components/
+│   │   ├── Analysis/              # 분석 관련 컴포넌트
+│   │   │   ├── AnalysisForm.tsx
+│   │   │   ├── AnalysisResult.tsx
+│   │   │   ├── AnalysisHistory.tsx
+│   │   │   ├── RecommendationBadge.tsx
+│   │   │   └── RiskGauge.tsx
+│   │   ├── Stock/                 # 종목 입력 컴포넌트
+│   │   │   ├── StockInput.tsx
+│   │   │   └── TimeframePicker.tsx
+│   │   ├── Layout/
+│   │   ├── Navigation/
+│   │   ├── Theme/
+│   │   └── ui/                    # shadcn/ui
+│   ├── lib/
+│   │   └── api/analysis.ts        # API 클라이언트
+│   ├── store/
+│   │   └── useAnalysisStore.ts    # Zustand 스토어
+│   └── types/
+│       └── stock.ts               # 타입 정의
 │
-├── docs/                      # Documentation
-│   ├── api/                   # API documentation
-│   │   ├── README.md          # Basic API docs
-│   │   └── BACKEND_API.md     # Full API reference
-│   ├── frontend/              # Frontend documentation
-│   │   ├── COMPONENTS.md      # React components
-│   │   ├── HOOKS.md           # Custom hooks
-│   │   └── STORES.md          # Zustand stores
-│   ├── architecture/          # Architecture docs
-│   └── guides/                # Developer guides
-│
-├── README.md                  # This file
-├── README.ko.md               # Korean documentation
-└── CLAUDE.md                  # AI assistant context
+└── docs/
 ```
 
 ---
 
-## Environment Configuration
+## Environment Variables
 
-### Backend Environment Variables
-
-Create `backend/.env` from `backend/env.example`:
+### Backend (.env)
 
 ```bash
-# Database Configuration
+# Database
 POSTGRES_USER=quantboard
 POSTGRES_PASSWORD=quantboard_dev
 POSTGRES_DB=quantboard
 POSTGRES_HOST=localhost
 POSTGRES_PORT=5432
 
-# Redis Configuration
-REDIS_HOST=localhost
-REDIS_PORT=6379
-REDIS_ENABLED=false              # Set to 'true' to enable real-time streaming
-
-# API Configuration
+# API
 API_HOST=0.0.0.0
 API_PORT=8000
+ENVIRONMENT=development
 
-# Environment
-ENVIRONMENT=development          # development | production
+# AI APIs
+OPENAI_API_KEY=sk-...
+ANTHROPIC_API_KEY=sk-ant-...  # Optional (fallback)
 
-# JWT Configuration
-JWT_SECRET_KEY=your-secret-key   # Auto-generated if not set
-JWT_ACCESS_TOKEN_EXPIRE_MINUTES=15
-JWT_REFRESH_TOKEN_EXPIRE_DAYS=7
+# Stock Data
+FINNHUB_API=your_finnhub_api_key
 
-# OAuth Configuration (Optional)
-GOOGLE_CLIENT_ID=
-GOOGLE_CLIENT_SECRET=
-GITHUB_CLIENT_ID=
-GITHUB_CLIENT_SECRET=
+# LLM Settings
+LLM_PRIMARY_PROVIDER=openai  # openai or anthropic
 ```
 
-### Frontend Environment Variables
+---
 
-Create `frontend/.env.local` (optional):
+## Analysis Output Format
 
-```bash
-NEXT_PUBLIC_API_URL=http://localhost:8000
-NEXT_PUBLIC_WS_URL=ws://localhost:8000
-```
+분석 결과는 다음 정보를 포함합니다:
+
+| 항목 | 설명 |
+|------|------|
+| **딥리서치 분석** | 종합적인 기업 및 시장 분석 |
+| **투자 의사결정** | strong_buy / buy / hold / sell / strong_sell |
+| **신뢰도** | high / medium / low |
+| **위험도 점수** | 1-10 (높을수록 위험) |
+| **위험 분석** | 변동성, 회사 리스크, 산업 리스크, 거시경제 |
+| **시장 현황** | 현재가, 가격 변동, 지지/저항선 |
+| **시장 심리** | bullish / neutral / bearish |
+| **핵심 요약** | 주요 포인트 3-5개 |
+| **현재 변동 요인** | 뉴스, 기술적, 펀더멘털 요인 |
+| **미래 촉매** | 단기, 중기, 장기 촉매 |
+
+---
+
+## Screenshots
+
+### 메인 화면
+- 종목 검색 (자동완성)
+- 투자 기간 선택
+- 분석 시작 버튼
+
+### 분석 결과
+- 투자 의사결정 배지
+- 위험도 게이지
+- 딥리서치 보고서
+- 시장 심리 분석
+
+### 히스토리
+- 이전 분석 목록
+- 시간 표시 (KST)
+- 빠른 재조회
 
 ---
 
 ## Development
 
-### Backend Development
+### Backend
 
-#### Run with Redis (Real-time mode)
 ```bash
 cd backend
-REDIS_ENABLED=true python main.py
+python main.py  # uvicorn with auto-reload
 ```
 
-#### Run without Redis (News + Candles only)
-```bash
-cd backend
-python main.py
-```
+API Docs: http://localhost:8000/docs
 
-#### Access API Documentation
-- Swagger UI: http://localhost:8000/docs
-- ReDoc: http://localhost:8000/redoc
+### Frontend
 
-#### Database Management
-```bash
-# View PostgreSQL logs
-docker-compose logs -f postgres
-
-# Connect to PostgreSQL
-docker exec -it <container_name> psql -U quantboard -d quantboard
-
-# View tables
-\dt
-
-# View news data
-SELECT * FROM news ORDER BY published DESC LIMIT 10;
-```
-
-#### Redis Management
-```bash
-# View Redis logs
-docker-compose logs -f redis
-
-# Connect to Redis CLI
-docker exec -it <container_name> redis-cli
-
-# Monitor published messages
-SUBSCRIBE live_prices
-```
-
-### Frontend Development
-
-#### Development Server
 ```bash
 cd frontend
-npm run dev
-```
-
-#### Build for Production
-```bash
-npm run build
-npm run start
-```
-
-#### Lint Code
-```bash
-npm run lint
-```
-
-#### Key Development Patterns
-
-**State Management (Zustand):**
-```typescript
-// Selective subscription
-const currentPrice = usePriceStore((state) => state.currentPrice);
-
-// Multiple values
-const { currentPrice, priceHistory } = usePriceStore();
-```
-
-**WebSocket Hook:**
-```typescript
-// Auto-reconnect with exponential backoff
-useWebSocket('ws://localhost:8000/ws/prices', {
-  onMessage: (data) => console.log(data),
-  reconnectInterval: 1000,
-  maxReconnectInterval: 30000,
-});
+npm run dev     # Development
+npm run build   # Production build
+npm run lint    # ESLint
 ```
 
 ---
 
-## Deployment
+## Supported Markets
 
-### Production Checklist
+| 시장 | 지원 여부 | 예시 |
+|------|----------|------|
+| 미국 (US) | O | AAPL, GOOGL, MSFT, TSLA |
+| 한국 (KR) | X (데이터 소스 제한) | - |
 
-- [ ] Set `ENVIRONMENT=production` in backend/.env
-- [ ] Configure CORS origins in backend/app/core/config.py
-- [ ] Enable SSL for WebSocket connections (wss://)
-- [ ] Set strong database passwords
-- [ ] Configure Redis persistence (if using real-time mode)
-- [ ] Set up reverse proxy (Nginx/Caddy)
-- [ ] Enable HTTPS with SSL certificates
-- [ ] Configure proper logging and monitoring
-- [ ] Set up database backups
-- [ ] Review rate limiting settings
-
-### Docker Deployment
-
-```bash
-# Build and run with Docker Compose
-docker-compose up -d --build
-
-# View logs
-docker-compose logs -f
-
-# Stop services
-docker-compose down
-```
-
-**For detailed deployment guide, see [docs/guides/DEPLOYMENT.md](./docs/guides/DEPLOYMENT.md)**
-
----
-
-## Contributing
-
-We welcome contributions! Please see [CONTRIBUTING.md](./CONTRIBUTING.md) for details.
-
-### Development Workflow
-
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Make your changes
-4. Run tests and linting
-5. Commit your changes (`git commit -m 'Add amazing feature'`)
-6. Push to the branch (`git push origin feature/amazing-feature`)
-7. Open a Pull Request
-
-### Code Standards
-
-- **TypeScript**: Strict mode enabled, no `any` types
-- **Python**: Type hints required, follow PEP 8
-- **State Management**: Use Zustand (Redux prohibited)
-- **Server Components**: Prefer Next.js server components, minimize 'use client'
-- **No Mock Data**: Always use real Binance API integration
+> 참고: Finnhub 무료 티어는 미국 주식만 지원합니다.
 
 ---
 
 ## License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+MIT License - see [LICENSE](LICENSE)
 
 ---
 
-## Troubleshooting
+## Contributing
 
-### Backend Issues
-
-**Redis Connection Error:**
-```bash
-# Check if Redis is running
-docker-compose ps
-
-# Restart Redis
-docker-compose restart redis
-
-# Or run without Redis
-REDIS_ENABLED=false python main.py
-```
-
-**Database Connection Error:**
-```bash
-# Check PostgreSQL status
-docker-compose ps
-
-# View PostgreSQL logs
-docker-compose logs postgres
-
-# Reset database
-docker-compose down -v
-docker-compose up -d
-```
-
-### Frontend Issues
-
-**WebSocket Connection Failed:**
-- Ensure backend is running on http://localhost:8000
-- Check that REDIS_ENABLED=true if using real-time features
-- Verify no firewall blocking WebSocket connections
-
-**Chart Not Rendering:**
-- Check browser console for errors
-- Verify candles API returns data: http://localhost:8000/api/candles?symbol=BTCUSDT&interval=1m&limit=100
+1. Fork the repository
+2. Create feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit changes (`git commit -m 'Add amazing feature'`)
+4. Push to branch (`git push origin feature/amazing-feature`)
+5. Open Pull Request
 
 ---
 
-## Support & Contact
-
-- **Documentation**: [docs/](./docs/)
-- **Issues**: [GitHub Issues](https://github.com/your-repo/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/your-repo/discussions)
-
----
-
-**Built with ❤️ for the crypto trading community**
+**Built with AI for smarter investment decisions**

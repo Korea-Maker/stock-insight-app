@@ -4,42 +4,42 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-**QuantBoard V1** - 고성능 실시간 트레이딩 대시보드. Binance 실시간 거래 데이터와 암호화폐 뉴스를 수집하여 WebSocket/REST API를 통해 클라이언트에 전달하는 시스템.
+**Stock Insight App** - AI 기반 주식 딥리서치 분석 애플리케이션. 종목코드/회사명을 입력하면 AI가 투자 분석 보고서를 생성합니다.
 
 ## Tech Stack
 
-- **Frontend:** Next.js 16 (App Router), React 19, TypeScript, Tailwind CSS 4, shadcn/ui, lucide-react
-- **Charting:** lightweight-charts
-- **State Management:** Zustand (Redux 사용 금지)
-- **Backend:** Python FastAPI (Async), websockets, SQLAlchemy (async)
-- **Database:** PostgreSQL (AsyncSession)
-- **Infrastructure:** Docker Compose (Redis, Postgres)
-- **Communication:** WebSocket (실시간 가격) + REST API (캔들/뉴스)
+- **Frontend:** Next.js 15 (App Router), React 19, TypeScript, Tailwind CSS 4, shadcn/ui, lucide-react
+- **State Management:** Zustand
+- **Backend:** Python FastAPI (Async), SQLAlchemy
+- **Database:** SQLite (stock_insights.db)
+- **AI:** OpenAI GPT-4o-mini (primary), Anthropic Claude (fallback)
+- **Stock Data:** Finnhub API (US stocks only)
 
 ## Commands
 
 ### Backend
 
 ```bash
-# 인프라 실행 (Redis, Postgres)
-cd backend && docker-compose up -d
+cd backend
 
-# 백엔드 서버 실행
-cd backend && python main.py
+# 가상환경 활성화
+venv\Scripts\activate  # Windows
+source venv/bin/activate  # macOS/Linux
+
+# 서버 실행 (auto-reload)
+python main.py
 
 # 의존성 설치
-cd backend && pip install -r requirements.txt
-
-# Redis 포함 실행 (실시간 가격 스트리밍)
-REDIS_ENABLED=true python main.py
+pip install -r requirements.txt
 ```
 
 ### Frontend
 
 ```bash
-cd frontend && npm run dev      # 개발 서버 (http://localhost:3000)
-cd frontend && npm run build    # 프로덕션 빌드
-cd frontend && npm run lint     # ESLint 실행
+cd frontend
+npm run dev      # 개발 서버 (http://localhost:3000)
+npm run build    # 프로덕션 빌드
+npm run lint     # ESLint 실행
 ```
 
 ## Architecture
@@ -47,21 +47,22 @@ cd frontend && npm run lint     # ESLint 실행
 ### Backend 구조
 ```
 backend/
-├── main.py                     # FastAPI 진입점, lifespan으로 백그라운드 태스크 관리
+├── main.py                     # FastAPI 진입점
 ├── app/
 │   ├── core/
 │   │   ├── config.py           # Pydantic Settings (환경변수)
-│   │   ├── database.py         # SQLAlchemy AsyncEngine, init_db/close_db
-│   │   └── redis.py            # Redis 클라이언트 싱글톤
+│   │   └── database.py         # SQLAlchemy (SQLite)
 │   ├── models/
-│   │   └── news.py             # SQLAlchemy News 모델
+│   │   └── stock_insight.py    # StockInsight 모델
 │   ├── routers/
-│   │   ├── ws.py               # WebSocket 실시간 가격 (/ws/prices)
-│   │   ├── candles.py          # REST 캔들 데이터 (/api/candles)
-│   │   └── news.py             # REST 뉴스 API (/api/news)
+│   │   └── analysis.py         # 분석 API 라우터
+│   ├── schemas/
+│   │   └── analysis.py         # Pydantic 스키마
 │   └── services/
-│       ├── ingestor.py         # Binance WebSocket 실시간 수집기
-│       └── news_collector.py   # 뉴스 RSS 수집기 (백그라운드)
+│       ├── stock_data_service.py    # Finnhub API 연동
+│       ├── stock_insight_engine.py  # AI 분석 엔진
+│       ├── prompts.py               # LLM 프롬프트
+│       └── response_parser.py       # JSON 응답 파싱
 ```
 
 ### Frontend 구조
@@ -70,67 +71,104 @@ frontend/
 ├── app/                        # Next.js App Router
 │   ├── page.tsx                # 메인 페이지
 │   ├── dashboard/page.tsx      # 대시보드
-│   ├── news/page.tsx           # 뉴스 목록
-│   └── news/[id]/page.tsx      # 뉴스 상세
+│   ├── history/page.tsx        # 분석 히스토리
+│   └── analysis/[id]/page.tsx  # 분석 상세
 ├── components/
-│   ├── Chart/CryptoChart.tsx   # lightweight-charts 차트
-│   ├── Dashboard/              # 대시보드 컴포넌트
-│   ├── Layout/MainLayout.tsx   # 메인 레이아웃
-│   └── Navigation/             # 네비게이션
-├── hooks/
-│   └── useWebSocket.ts         # WebSocket 훅 (지수 백오프 재연결)
-└── store/
-    └── usePriceStore.ts        # Zustand 가격 상태
+│   ├── Analysis/               # 분석 결과 컴포넌트
+│   │   ├── AnalysisForm.tsx
+│   │   ├── AnalysisResult.tsx
+│   │   ├── AnalysisHistory.tsx
+│   │   ├── RecommendationBadge.tsx
+│   │   └── RiskGauge.tsx
+│   ├── Stock/                  # 종목 입력 컴포넌트
+│   │   ├── StockInput.tsx      # 자동완성 검색
+│   │   └── TimeframePicker.tsx # 투자 기간 선택
+│   ├── Layout/MainLayout.tsx
+│   ├── Navigation/TopNav.tsx
+│   └── Theme/                  # 다크/라이트 테마
+├── lib/api/analysis.ts         # API 클라이언트
+├── store/useAnalysisStore.ts   # Zustand 상태
+└── types/stock.ts              # 타입 정의
 ```
 
 ## API Endpoints
 
-- `GET /health` - 헬스 체크
-- `GET /api/candles?symbol=BTCUSDT&interval=1m&limit=500` - Binance 캔들 데이터
-- `GET /api/news?skip=0&limit=20&source=CoinDesk` - 뉴스 목록
-- `GET /api/news/{id}` - 뉴스 상세
-- `GET /api/news/sources` - 뉴스 소스 목록
-- `WS /ws/prices` - 실시간 가격 스트림 (Redis 필요)
+```
+GET  /health                    # 헬스 체크
+POST /api/analysis/stock        # 주식 분석 실행
+GET  /api/analysis/history      # 분석 히스토리
+GET  /api/analysis/{id}         # 분석 상세 조회
+GET  /api/analysis/search       # 종목 검색
+```
 
 ## Data Flow
 
-**실시간 가격 (Redis 필요):**
-1. Binance WebSocket → `BinanceIngestor` → Redis Pub/Sub (`live_prices`)
-2. `ConnectionManager` ← Redis 구독 → WebSocket 브로드캐스트
-3. `useWebSocket` 훅 → `usePriceStore` 업데이트
+**분석 요청:**
+1. Frontend: 종목코드 + 투자기간 입력
+2. Backend: Finnhub API에서 주식 데이터 조회
+3. Backend: OpenAI/Anthropic API로 딥리서치 분석
+4. Backend: SQLite에 결과 저장
+5. Frontend: 분석 결과 표시
 
-**뉴스 수집 (DB만 필요):**
-1. RSS Feeds → `news_collector` → PostgreSQL (News 테이블)
-2. REST API → 프론트엔드 조회
+## Key Features
 
-## Key Patterns
-
-### Backend
-- `REDIS_ENABLED=false`(기본값)로 Redis 없이 실행 가능 (뉴스/캔들 API만 동작)
-- FastAPI lifespan으로 백그라운드 태스크 시작/종료 관리
-- SQLAlchemy AsyncSession + Depends(get_db) 패턴
-
-### Frontend
-- Zustand 선택적 구독: `usePriceStore((state) => state.currentPrice)`
-- useWebSocket 지수 백오프 재연결 (1s→2s→4s... max 30s)
-- 가격 히스토리 1000개 제한
+### 분석 출력 항목
+- **딥리서치 분석**: 종합 투자 분석
+- **투자 의사결정**: strong_buy/buy/hold/sell/strong_sell
+- **신뢰도**: high/medium/low
+- **위험도 점수**: 1-10
+- **시장 심리**: bullish/neutral/bearish
+- **핵심 요약**: 주요 포인트 리스트
+- **변동 요인**: 뉴스/기술적/펀더멘털
+- **미래 촉매**: 단기/중기/장기
 
 ## Environment Variables
 
 Backend (`backend/.env`):
 ```
-REDIS_HOST=localhost
-REDIS_PORT=6379
-REDIS_ENABLED=false           # true로 설정 시 실시간 가격 활성화
-POSTGRES_USER=quantboard
-POSTGRES_PASSWORD=quantboard_dev
-POSTGRES_DB=quantboard
+# API Keys
+OPENAI_API_KEY=sk-...
+FINNHUB_API=your_finnhub_key
+
+# Optional
+ANTHROPIC_API_KEY=sk-ant-...
+
+# Settings
+LLM_PRIMARY_PROVIDER=openai
+API_PORT=8000
 ```
 
 ## Development Rules
 
-- 단계별 개발 진행 (현재 Phase에만 집중)
-- Mock 데이터 사용 금지 - 실제 Binance API 연결
-- TypeScript strict 모드, Pydantic 모델 필수
-- URL 상태 관리 시 `nuqs` 사용
-- `use client` 최소화 (Next.js 서버 컴포넌트 우선)
+- TypeScript strict 모드 사용
+- Pydantic 모델 필수
+- 실제 API 데이터 사용 (Mock 금지)
+- `use client` 최소화 (서버 컴포넌트 우선)
+- Zustand로 상태 관리
+- SSL 검증 비활성화 (회사 네트워크 환경)
+
+## Supported Markets
+
+| 시장 | 지원 | 비고 |
+|------|------|------|
+| US | O | AAPL, GOOGL, MSFT, TSLA 등 |
+| KR | X | Finnhub 무료 티어 미지원 |
+
+## Common Tasks
+
+### 새 분석 실행
+```bash
+curl -X POST http://localhost:8000/api/analysis/stock \
+  -H "Content-Type: application/json" \
+  -d '{"stock_code": "AAPL", "timeframe": "mid"}'
+```
+
+### 분석 결과 조회
+```bash
+curl http://localhost:8000/api/analysis/1
+```
+
+### 히스토리 조회
+```bash
+curl http://localhost:8000/api/analysis/history?limit=10
+```
