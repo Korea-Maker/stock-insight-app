@@ -34,25 +34,3 @@ export function ThemeToggle() {
     </div>
   );
 }
-
-// 간단한 토글 버튼 (라이트/다크만)
-export function ThemeToggleSimple() {
-  const { resolvedTheme, setTheme } = useTheme();
-
-  return (
-    <button
-      onClick={() => setTheme(resolvedTheme === 'dark' ? 'light' : 'dark')}
-      className={cn(
-        "p-2 rounded-lg transition-all duration-200",
-        "hover:bg-accent text-muted-foreground hover:text-foreground"
-      )}
-      title={resolvedTheme === 'dark' ? '라이트 모드' : '다크 모드'}
-    >
-      {resolvedTheme === 'dark' ? (
-        <Sun className="h-5 w-5" />
-      ) : (
-        <Moon className="h-5 w-5" />
-      )}
-    </button>
-  );
-}

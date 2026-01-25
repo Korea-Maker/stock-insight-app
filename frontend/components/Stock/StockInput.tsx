@@ -51,8 +51,7 @@ export function StockInput({
         setSearchResults(results);
         setShowDropdown(results.length > 0);
         setSelectedIndex(-1);
-      } catch (error) {
-        console.error('종목 검색 실패:', error);
+      } catch {
         setSearchResults([]);
       } finally {
         setIsSearching(false);
@@ -122,12 +121,12 @@ export function StockInput({
     }
   };
 
-  const marketColors = {
+  const marketColors: Record<string, string> = {
     US: 'text-blue-500',
     KR: 'text-rose-500',
   };
 
-  const marketLabels = {
+  const marketLabels: Record<string, string> = {
     US: '미국',
     KR: '한국',
   };
