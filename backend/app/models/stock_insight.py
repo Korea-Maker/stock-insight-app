@@ -12,6 +12,9 @@ class StockInsight(Base):
 
     id = Column(Integer, primary_key=True, autoincrement=True)
 
+    # 사용자 식별
+    user_id = Column(String(36), nullable=False, index=True)  # UUID v4
+
     # 종목 정보
     stock_code = Column(String(20), nullable=False, index=True)  # AAPL, 005930.KS
     stock_name = Column(String(100), nullable=False)  # Apple Inc., 삼성전자
