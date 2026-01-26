@@ -1,819 +1,251 @@
 # Development Guide
 
-Complete guide for developing and contributing to QuantBoard V1.
+Stock Insight App 로컬 개발 환경 설정 및 개발 가이드입니다.
 
-## Table of Contents
+## 사전 요구사항
 
-- [Getting Started](#getting-started)
-- [Development Environment Setup](#development-environment-setup)
-- [Project Structure](#project-structure)
-- [Code Standards](#code-standards)
-- [Development Workflow](#development-workflow)
-- [Testing](#testing)
-- [Debugging](#debugging)
-- [Common Tasks](#common-tasks)
-- [Best Practices](#best-practices)
-- [Troubleshooting](#troubleshooting)
-
----
-
-## Getting Started
-
-### Prerequisites
-
-Ensure you have the following installed:
-
-- **Node.js** 18+ and npm
-- **Python** 3.11+
-- **Docker** and Docker Compose
+- **Node.js** 18+
+- **Python** 3.10+
 - **Git**
-- **VS Code** (recommended) or your preferred IDE
 
-### Initial Setup
+> **Note:** Docker 불필요 - SQLite 사용
 
-1. Clone the repository:
+## 환경 설정
+
+### 1. 저장소 클론
+
 ```bash
 git clone <repository-url>
-cd market-insight-agent
+cd stock-insight-app
 ```
 
-2. Install backend dependencies:
+### 2. 백엔드 설정
+
 ```bash
 cd backend
+
+# 가상환경 생성
 python -m venv venv
 
+# 활성화
 # Windows
 venv\Scripts\activate
-
 # macOS/Linux
 source venv/bin/activate
 
+# 의존성 설치
 pip install -r requirements.txt
+
+# 환경 변수 설정
+cp env.example .env
+# .env 파일 편집하여 API 키 설정
 ```
 
-3. Install frontend dependencies:
+### 3. 프론트엔드 설정
+
 ```bash
 cd frontend
 npm install
 ```
 
-4. Set up environment variables:
-```bash
-# Backend
-cd backend
-cp env.example .env
-# Edit .env with your settings
+## 환경 변수
 
-# Frontend (optional)
-cd frontend
-cp .env.example .env.local
-# Edit .env.local if needed
-```
-
-5. Start infrastructure:
-```bash
-cd backend
-docker-compose up -d
-```
-
-6. Verify setup:
-```bash
-# Check Docker containers
-docker-compose ps
-
-# Should show postgres and redis running
-```
-
----
-
-## Development Environment Setup
-
-### VS Code Extensions (Recommended)
-
-**Python:**
-- Python (Microsoft)
-- Pylance
-- Black Formatter
-- isort
-
-**JavaScript/TypeScript:**
-- ESLint
-- Prettier
-- Tailwind CSS IntelliSense
-- ES7+ React/Redux/React-Native snippets
-
-**General:**
-- GitLens
-- Docker
-- REST Client
-- Thunder Client (API testing)
-
-### VS Code Settings
-
-Create `.vscode/settings.json`:
-
-```json
-{
-  "python.defaultInterpreterPath": "${workspaceFolder}/backend/venv/bin/python",
-  "python.linting.enabled": true,
-  "python.linting.pylintEnabled": false,
-  "python.linting.flake8Enabled": true,
-  "python.formatting.provider": "black",
-  "editor.formatOnSave": true,
-  "editor.codeActionsOnSave": {
-    "source.organizeImports": true
-  },
-  "[python]": {
-    "editor.defaultFormatter": "ms-python.black-formatter"
-  },
-  "[typescript]": {
-    "editor.defaultFormatter": "esbenp.prettier-vscode"
-  },
-  "[typescriptreact]": {
-    "editor.defaultFormatter": "esbenp.prettier-vscode"
-  }
-}
-```
-
-### Environment Variables
-
-**Backend (`backend/.env`):**
+### Backend (`backend/.env`)
 
 ```bash
-# Database
-POSTGRES_USER=quantboard
-POSTGRES_PASSWORD=quantboard_dev
-POSTGRES_DB=quantboard
-POSTGRES_HOST=localhost
-POSTGRES_PORT=5432
+# 필수: OpenAI API 키
+OPENAI_API_KEY=sk-...
 
-# Redis
-REDIS_HOST=localhost
-REDIS_PORT=6379
-REDIS_ENABLED=false  # Set to true for real-time features
+# 필수: Finnhub API 키
+FINNHUB_API=your_finnhub_api_key
 
-# API
-API_HOST=0.0.0.0
+# 선택: Anthropic API 키 (폴백)
+ANTHROPIC_API_KEY=sk-ant-...
+
+# 선택: Polar 결제
+POLAR_ACCESS_TOKEN=your_polar_token
+POLAR_PRODUCT_ID=your_product_id
+
+# 설정
+LLM_PRIMARY_PROVIDER=openai
 API_PORT=8000
-
-# Environment
-ENVIRONMENT=development
-
-# CORS (add frontend URL)
-CORS_ORIGINS=["http://localhost:3000"]
 ```
 
-**Frontend (`frontend/.env.local`):**
+## 개발 서버 실행
 
-```bash
-NEXT_PUBLIC_API_URL=http://localhost:8000
-NEXT_PUBLIC_WS_URL=ws://localhost:8000
-```
+### 백엔드
 
----
-
-## Project Structure
-
-### Backend Structure
-
-```
-backend/
-├── app/
-│   ├── core/                   # Core configuration
-│   │   ├── config.py           # Pydantic Settings
-│   │   ├── database.py         # Database configuration
-│   │   └── redis.py            # Redis client
-│   ├── models/                 # Database models
-│   │   └── news.py             # News model
-│   ├── routers/                # API routes
-│   │   ├── ws.py               # WebSocket routes
-│   │   ├── candles.py          # Candles API
-│   │   └── news.py             # News API
-│   └── services/               # Background services
-│       ├── ingestor.py         # Binance data ingestor
-│       └── news_collector.py   # News collector
-├── main.py                     # Application entry point
-├── requirements.txt            # Python dependencies
-├── docker-compose.yml          # Infrastructure setup
-└── .env                        # Environment variables (gitignored)
-```
-
-### Frontend Structure
-
-```
-frontend/
-├── app/                        # Next.js App Router
-│   ├── page.tsx                # Homepage
-│   ├── layout.tsx              # Root layout
-│   ├── dashboard/              # Dashboard routes
-│   └── news/                   # News routes
-├── components/                 # React components
-│   ├── Chart/                  # Chart components
-│   ├── Dashboard/              # Dashboard components
-│   ├── Layout/                 # Layout components
-│   └── Navigation/             # Navigation components
-├── hooks/                      # Custom hooks
-│   └── useWebSocket.ts         # WebSocket hook
-├── store/                      # Zustand stores
-│   └── usePriceStore.ts        # Price state
-├── lib/                        # Utilities
-│   └── utils.ts                # Helper functions
-├── styles/                     # Global styles
-└── public/                     # Static assets
-```
-
----
-
-## Code Standards
-
-### Python (Backend)
-
-**Style Guide:**
-- Follow PEP 8
-- Use Black formatter (line length: 88)
-- Type hints required for all functions
-- Docstrings for all public functions (Google style)
-
-**Example:**
-
-```python
-from typing import Optional
-from pydantic import BaseModel
-
-
-class CandleData(BaseModel):
-    """
-    Represents a single OHLC candle.
-
-    Attributes:
-        time: Unix timestamp in seconds
-        open: Opening price
-        high: Highest price in interval
-        low: Lowest price in interval
-        close: Closing price
-        volume: Trading volume
-    """
-    time: int
-    open: float
-    high: float
-    low: float
-    close: float
-    volume: float
-
-
-async def fetch_candles(
-    symbol: str,
-    interval: str = "1m",
-    limit: int = 500
-) -> list[CandleData]:
-    """
-    Fetch candle data from Binance API.
-
-    Args:
-        symbol: Trading pair (e.g., BTCUSDT)
-        interval: Time interval (1m, 5m, 1h, etc.)
-        limit: Number of candles to fetch
-
-    Returns:
-        List of candle data objects
-
-    Raises:
-        HTTPException: If Binance API request fails
-    """
-    # Implementation here
-    pass
-```
-
-**Imports Organization:**
-
-```python
-# Standard library
-import asyncio
-import json
-from typing import Optional
-
-# Third-party
-from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel
-
-# Local
-from app.core.config import settings
-from app.models.news import News
-```
-
-### TypeScript/React (Frontend)
-
-**Style Guide:**
-- Use TypeScript strict mode
-- No `any` types (use `unknown` if needed)
-- Prefer functional components
-- Use React Server Components when possible
-- Minimize 'use client' directives
-
-**Example:**
-
-```typescript
-// components/PriceCard.tsx
-import { FC } from 'react';
-
-interface PriceCardProps {
-  symbol: string;
-  price: number;
-  change24h: number;
-}
-
-export const PriceCard: FC<PriceCardProps> = ({
-  symbol,
-  price,
-  change24h,
-}) => {
-  const isPositive = change24h >= 0;
-
-  return (
-    <div className="rounded-lg border p-4">
-      <h3 className="text-sm font-medium text-muted-foreground">
-        {symbol}
-      </h3>
-      <p className="text-2xl font-bold">${price.toLocaleString()}</p>
-      <p className={isPositive ? 'text-green-500' : 'text-red-500'}>
-        {isPositive ? '+' : ''}{change24h.toFixed(2)}%
-      </p>
-    </div>
-  );
-};
-```
-
-**State Management (Zustand):**
-
-```typescript
-// store/usePriceStore.ts
-import { create } from 'zustand';
-
-interface PriceState {
-  currentPrice: number | null;
-  priceHistory: Array<{ price: number; timestamp: number }>;
-  updatePrice: (symbol: string, price: number, timestamp: number) => void;
-  clearHistory: () => void;
-}
-
-export const usePriceStore = create<PriceState>((set) => ({
-  currentPrice: null,
-  priceHistory: [],
-
-  updatePrice: (symbol, price, timestamp) =>
-    set((state) => ({
-      currentPrice: price,
-      priceHistory: [
-        ...state.priceHistory,
-        { price, timestamp },
-      ].slice(-1000), // Keep last 1000
-    })),
-
-  clearHistory: () =>
-    set({
-      currentPrice: null,
-      priceHistory: [],
-    }),
-}));
-```
-
-### Database Migrations
-
-When modifying database models:
-
-```python
-# app/models/news.py
-from sqlalchemy import Column, Integer, String, DateTime, Text
-from sqlalchemy.ext.declarative import declarative_base
-
-Base = declarative_base()
-
-class News(Base):
-    __tablename__ = "news"
-
-    id = Column(Integer, primary_key=True, index=True)
-    title = Column(String(500), nullable=False)
-    title_kr = Column(String(500), nullable=True)
-    link = Column(String(1000), unique=True, nullable=False)
-    published = Column(DateTime, nullable=True)
-    source = Column(String(100), nullable=False)
-    description = Column(Text, nullable=True)
-    created_at = Column(DateTime, server_default="now()")
-```
-
-**Note:** Tables are created automatically on app startup via `init_db()`.
-
----
-
-## Development Workflow
-
-### 1. Start Development Servers
-
-**Terminal 1 - Backend:**
 ```bash
 cd backend
-
-# Activate virtual environment
-source venv/bin/activate  # or venv\Scripts\activate on Windows
-
-# Start infrastructure
-docker-compose up -d
-
-# Run backend (without Redis)
+venv\Scripts\activate  # Windows
 python main.py
-
-# OR with Redis for real-time features
-REDIS_ENABLED=true python main.py
 ```
 
-**Terminal 2 - Frontend:**
+서버: `http://localhost:8000`
+
+### 프론트엔드
+
 ```bash
 cd frontend
 npm run dev
 ```
 
-**Terminal 3 - Logs (optional):**
-```bash
-cd backend
-docker-compose logs -f
-```
+서버: `http://localhost:3000`
 
-### 2. Create a New Feature
+## 프로젝트 구조
 
-**Branch Strategy:**
-```bash
-# Create feature branch
-git checkout -b feature/your-feature-name
-
-# Make changes
-# ...
-
-# Commit
-git add .
-git commit -m "feat: add your feature description"
-
-# Push
-git push origin feature/your-feature-name
-```
-
-**Commit Message Convention:**
+### Backend
 
 ```
-<type>(<scope>): <subject>
-
-Types:
-- feat: New feature
-- fix: Bug fix
-- docs: Documentation changes
-- style: Code style changes (formatting)
-- refactor: Code refactoring
-- test: Adding tests
-- chore: Build process or auxiliary tool changes
-
-Examples:
-feat(api): add pagination to news endpoint
-fix(websocket): handle reconnection on network error
-docs(readme): update installation instructions
+backend/
+├── main.py                     # FastAPI 진입점
+├── app/
+│   ├── core/
+│   │   ├── config.py           # Pydantic Settings
+│   │   └── database.py         # SQLAlchemy (SQLite)
+│   ├── models/
+│   │   └── stock_insight.py    # StockInsight 모델
+│   ├── routers/
+│   │   ├── analysis.py         # 분석 API
+│   │   └── payment.py          # 결제 API
+│   ├── schemas/
+│   │   └── analysis.py         # Pydantic 스키마
+│   └── services/
+│       ├── stock_insight_engine.py  # AI 분석 엔진
+│       ├── stock_data_service.py    # 주식 데이터 서비스
+│       ├── payment_service.py       # 결제 서비스
+│       ├── prompts.py               # LLM 프롬프트
+│       └── response_parser.py       # 응답 파싱
+└── stock_insights.db           # SQLite 데이터베이스 (자동 생성)
 ```
 
-### 3. Adding a New API Endpoint
+### Frontend
 
-**Backend (FastAPI):**
+```
+frontend/
+├── app/                        # Next.js App Router
+│   ├── page.tsx
+│   ├── dashboard/page.tsx
+│   ├── history/page.tsx
+│   └── analysis/[id]/page.tsx
+├── components/
+│   ├── Analysis/               # 분석 컴포넌트
+│   ├── Stock/                  # 종목 입력 컴포넌트
+│   ├── Layout/                 # 레이아웃
+│   ├── Navigation/             # 네비게이션
+│   ├── Theme/                  # 테마
+│   ├── Legal/                  # 법적 고지
+│   └── ui/                     # shadcn/ui
+├── store/
+│   └── useAnalysisStore.ts     # Zustand 스토어
+├── lib/
+│   └── api/analysis.ts         # API 클라이언트
+└── types/
+    └── stock.ts                # 타입 정의
+```
+
+## 코딩 표준
+
+### Python (Backend)
+
+- **PEP 8** 준수
+- **Type hints** 필수
+- **Pydantic** 모델로 검증
+- **async/await** 사용
 
 ```python
-# backend/app/routers/your_router.py
-from fastapi import APIRouter, Depends
-from sqlalchemy.ext.asyncio import AsyncSession
-from app.core.database import get_db
-
-router = APIRouter(prefix="/api/your-endpoint", tags=["YourTag"])
-
-@router.get("/")
-async def get_items(
-    skip: int = 0,
-    limit: int = 20,
-    db: AsyncSession = Depends(get_db)
-):
-    """Get items with pagination."""
-    # Implementation
-    return {"items": []}
+async def get_stock_data(
+    symbol: str,
+    timeframe: str = "mid"
+) -> Optional[StockData]:
+    """주식 데이터 조회"""
+    # ...
 ```
 
-**Register router in `main.py`:**
+### TypeScript (Frontend)
 
-```python
-from app.routers import your_router
-
-app.include_router(your_router.router)
-```
-
-**Frontend (API call):**
+- **TypeScript strict** 모드
+- **함수형 컴포넌트** 선호
+- **서버 컴포넌트** 우선 (use client 최소화)
+- **Zustand** 상태 관리
 
 ```typescript
-// lib/api.ts
-export async function fetchItems(skip = 0, limit = 20) {
-  const response = await fetch(
-    `${process.env.NEXT_PUBLIC_API_URL}/api/your-endpoint?skip=${skip}&limit=${limit}`
-  );
+interface Props {
+  stockCode: string
+}
 
-  if (!response.ok) {
-    throw new Error('Failed to fetch items');
-  }
-
-  return response.json();
+export function StockCard({ stockCode }: Props) {
+  // ...
 }
 ```
 
-### 4. Adding a New Component
+## API 테스트
 
-```typescript
-// components/YourComponent/YourComponent.tsx
-'use client'; // Only if needed (state, effects, etc.)
+### curl
 
-import { FC } from 'react';
-
-interface YourComponentProps {
-  // Props interface
-}
-
-export const YourComponent: FC<YourComponentProps> = (props) => {
-  return (
-    <div>
-      {/* Component JSX */}
-    </div>
-  );
-};
-```
-
----
-
-## Testing
-
-### Backend Testing
-
-**Setup:**
 ```bash
-cd backend
-pip install pytest pytest-asyncio httpx
+# 헬스 체크
+curl http://localhost:8000/health
+
+# 분석 요청
+curl -X POST http://localhost:8000/api/analysis/stock \
+  -H "Content-Type: application/json" \
+  -d '{"stock_code": "AAPL", "timeframe": "mid"}'
+
+# 분석 결과 조회
+curl http://localhost:8000/api/analysis/1
+
+# 분석 히스토리
+curl http://localhost:8000/api/analysis/history
+
+# 종목 검색
+curl "http://localhost:8000/api/analysis/search/stock?query=apple"
 ```
 
-**Create test file:**
+### Swagger UI
 
-```python
-# tests/test_candles.py
-import pytest
-from httpx import AsyncClient
-from main import app
+`http://localhost:8000/docs` 접속
 
-@pytest.mark.asyncio
-async def test_get_candles():
-    async with AsyncClient(app=app, base_url="http://test") as client:
-        response = await client.get("/api/candles?symbol=BTCUSDT&interval=1m&limit=10")
+## 데이터베이스
 
-    assert response.status_code == 200
-    data = response.json()
-    assert data["symbol"] == "BTCUSDT"
-    assert len(data["candles"]) > 0
-```
+SQLite를 사용하며 `backend/stock_insights.db` 파일이 자동 생성됩니다.
 
-**Run tests:**
+### 초기화
+
+데이터베이스를 초기화하려면:
+
 ```bash
-pytest
+rm backend/stock_insights.db
 ```
 
-### Frontend Testing
+서버 재시작 시 테이블이 자동 생성됩니다.
 
-**Setup:**
+## 문제 해결
+
+### SSL 인증서 오류
+
+회사 네트워크 환경에서 발생할 수 있습니다. 코드에서 이미 `verify=False`로 처리되어 있습니다.
+
+### API 키 오류
+
+```
+OPENAI_API_KEY가 설정되지 않았습니다
+```
+
+`.env` 파일에 API 키가 올바르게 설정되었는지 확인하세요.
+
+### 포트 충돌
+
 ```bash
-cd frontend
-npm install --save-dev @testing-library/react @testing-library/jest-dom jest
+# 8000 포트 사용 중인 프로세스 확인 (Windows)
+netstat -ano | findstr :8000
+
+# 프로세스 종료
+taskkill /PID <PID> /F
 ```
 
-**Create test file:**
+### 모듈 없음 오류
 
-```typescript
-// components/PriceCard/PriceCard.test.tsx
-import { render, screen } from '@testing-library/react';
-import { PriceCard } from './PriceCard';
-
-describe('PriceCard', () => {
-  it('renders price correctly', () => {
-    render(
-      <PriceCard symbol="BTCUSDT" price={42500} change24h={2.5} />
-    );
-
-    expect(screen.getByText('BTCUSDT')).toBeInTheDocument();
-    expect(screen.getByText('$42,500')).toBeInTheDocument();
-    expect(screen.getByText('+2.50%')).toBeInTheDocument();
-  });
-});
-```
-
-**Run tests:**
-```bash
-npm test
-```
-
----
-
-## Debugging
-
-### Backend Debugging
-
-**VS Code launch configuration (`.vscode/launch.json`):**
-
-```json
-{
-  "version": "0.2.0",
-  "configurations": [
-    {
-      "name": "Python: FastAPI",
-      "type": "python",
-      "request": "launch",
-      "module": "uvicorn",
-      "args": [
-        "main:app",
-        "--reload",
-        "--host", "0.0.0.0",
-        "--port", "8000"
-      ],
-      "jinja": true,
-      "cwd": "${workspaceFolder}/backend",
-      "env": {
-        "REDIS_ENABLED": "true"
-      }
-    }
-  ]
-}
-```
-
-**Logging:**
-
-```python
-import logging
-
-logger = logging.getLogger(__name__)
-
-@router.get("/debug")
-async def debug_endpoint():
-    logger.info("Debug endpoint called")
-    logger.debug("Detailed debug information")
-    logger.error("Error occurred", exc_info=True)
-    return {"status": "ok"}
-```
-
-### Frontend Debugging
-
-**React DevTools:**
-- Install React DevTools browser extension
-- Inspect component tree and state
-
-**Network debugging:**
-```typescript
-// Add logging to API calls
-export async function fetchCandles(symbol: string) {
-  console.log('Fetching candles for', symbol);
-
-  const response = await fetch(`/api/candles?symbol=${symbol}`);
-
-  console.log('Response status:', response.status);
-
-  const data = await response.json();
-  console.log('Received data:', data);
-
-  return data;
-}
-```
-
-**WebSocket debugging:**
-```typescript
-const ws = new WebSocket(url);
-
-ws.onopen = () => console.log('WS Connected');
-ws.onmessage = (e) => console.log('WS Message:', JSON.parse(e.data));
-ws.onerror = (e) => console.error('WS Error:', e);
-ws.onclose = () => console.log('WS Disconnected');
-```
-
----
-
-## Common Tasks
-
-### Add a New Database Model
-
-1. Create model file:
-```python
-# app/models/watchlist.py
-from sqlalchemy import Column, Integer, String, DateTime
-from app.core.database import Base
-
-class Watchlist(Base):
-    __tablename__ = "watchlist"
-
-    id = Column(Integer, primary_key=True, index=True)
-    symbol = Column(String(20), nullable=False)
-    added_at = Column(DateTime, server_default="now()")
-```
-
-2. Import in `app/models/__init__.py`:
-```python
-from .news import News
-from .watchlist import Watchlist
-```
-
-3. Restart server (tables created automatically)
-
-### Add a New Zustand Store
-
-```typescript
-// store/useNewsStore.ts
-import { create } from 'zustand';
-
-interface NewsState {
-  articles: NewsItem[];
-  loading: boolean;
-  fetchNews: () => Promise<void>;
-}
-
-export const useNewsStore = create<NewsState>((set) => ({
-  articles: [],
-  loading: false,
-
-  fetchNews: async () => {
-    set({ loading: true });
-    const response = await fetch('/api/news');
-    const data = await response.json();
-    set({ articles: data.items, loading: false });
-  },
-}));
-```
-
-### Add Environment Variable
-
-1. Add to `.env.example`:
-```bash
-NEW_VARIABLE=default_value
-```
-
-2. Add to Pydantic Settings:
-```python
-# app/core/config.py
-from pydantic_settings import BaseSettings
-
-class Settings(BaseSettings):
-    NEW_VARIABLE: str = "default_value"
-
-    class Config:
-        env_file = ".env"
-```
-
-3. Use in code:
-```python
-from app.core.config import settings
-
-print(settings.NEW_VARIABLE)
-```
-
----
-
-## Best Practices
-
-### Backend Best Practices
-
-1. **Always use async/await** for I/O operations
-2. **Use dependency injection** (`Depends(get_db)`)
-3. **Validate all inputs** with Pydantic models
-4. **Handle errors gracefully** with try/except
-5. **Log important events** (not everything)
-6. **Use type hints** everywhere
-7. **Keep routes thin** - move logic to services
-
-### Frontend Best Practices
-
-1. **Prefer Server Components** - only use 'use client' when necessary
-2. **Use Zustand selectively** - subscribe to specific state slices
-3. **Memoize expensive computations** with `useMemo`
-4. **Debounce user input** for API calls
-5. **Handle loading and error states** in UI
-6. **Use TypeScript interfaces** for props and data
-7. **Keep components small** - single responsibility
-
-### General Best Practices
-
-1. **Never commit secrets** to git
-2. **Write meaningful commit messages**
-3. **Test before committing**
-4. **Update documentation** when changing APIs
-5. **Review your own code** before PR
-6. **Use feature flags** for experimental features
-
----
-
-## Troubleshooting
-
-### Common Issues
-
-**Issue: Module not found**
 ```bash
 # Backend
 cd backend
@@ -824,68 +256,28 @@ cd frontend
 npm install
 ```
 
-**Issue: Port already in use**
-```bash
-# Find and kill process on port 8000
-lsof -i :8000
-kill -9 <PID>
+## 커밋 메시지 규칙
 
-# Or use different port
-uvicorn main:app --port 8001
+```
+<type>: <description>
+
+Types:
+- feat: 새 기능
+- fix: 버그 수정
+- refactor: 리팩토링
+- docs: 문서
+- test: 테스트
+- chore: 빌드/설정
+
+예시:
+feat: 종목 검색 자동완성 추가
+fix: 분석 결과 null 처리 수정
+docs: API 문서 업데이트
 ```
 
-**Issue: Database connection error**
-```bash
-# Check Docker containers
-docker-compose ps
+## 추가 리소스
 
-# Restart PostgreSQL
-docker-compose restart postgres
-
-# View logs
-docker-compose logs postgres
-```
-
-**Issue: Redis connection error**
-```bash
-# Check Redis status
-docker-compose ps
-
-# Test Redis connection
-docker exec -it <redis-container> redis-cli ping
-# Should return PONG
-
-# Or disable Redis
-REDIS_ENABLED=false python main.py
-```
-
-**Issue: WebSocket connection refused**
-- Ensure backend is running
-- Check `REDIS_ENABLED=true` in `.env`
-- Verify Redis is running: `docker-compose ps`
-- Check firewall/antivirus blocking connections
-
-**Issue: Hot reload not working**
-```bash
-# Frontend - clear .next directory
-cd frontend
-rm -rf .next
-npm run dev
-
-# Backend - ensure using --reload flag
-uvicorn main:app --reload
-```
-
----
-
-## Additional Resources
-
-- [FastAPI Documentation](https://fastapi.tiangolo.com/)
-- [Next.js Documentation](https://nextjs.org/docs)
-- [Zustand Documentation](https://docs.pmnd.rs/zustand)
-- [SQLAlchemy Async Documentation](https://docs.sqlalchemy.org/en/20/orm/extensions/asyncio.html)
-- [Pydantic Documentation](https://docs.pydantic.dev/)
-
----
-
-**Last Updated:** 2024-01-17
+- [FastAPI 문서](https://fastapi.tiangolo.com/)
+- [Next.js 문서](https://nextjs.org/docs)
+- [Zustand 문서](https://docs.pmnd.rs/zustand)
+- [SQLAlchemy 문서](https://docs.sqlalchemy.org/)

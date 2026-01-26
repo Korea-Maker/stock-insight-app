@@ -1,70 +1,138 @@
-# QuantBoard Backend
+# Stock Insight Backend
 
-QuantBoard V1 트레이딩 대시보드를 위한 FastAPI 백엔드입니다.
+Stock Insight App의 FastAPI 백엔드입니다.
 
-## 설정
+## 기술 스택
 
-### 방법 1: Docker 사용 (권장)
+- **Python** 3.10+
+- **FastAPI** (Async)
+- **SQLAlchemy** (Async) + SQLite
+- **OpenAI** GPT-4o-mini
+- **Anthropic** Claude (Fallback)
+- **Finnhub** API (US Stocks)
+- **yfinance** (KR Stocks)
+- **Polar** (Payment)
 
-1. 가상 환경 생성:
+## 빠른 시작
+
+### 1. 가상환경 설정
+
 ```bash
 python -m venv venv
-source venv/bin/activate  # Windows: venv\Scripts\activate
+
+# Windows
+venv\Scripts\activate
+
+# macOS/Linux
+source venv/bin/activate
 ```
 
-2. 의존성 설치:
+### 2. 의존성 설치
+
 ```bash
 pip install -r requirements.txt
 ```
 
-3. 환경 변수 설정:
+### 3. 환경 변수 설정
+
+`.env` 파일 생성:
+
 ```bash
-cp env.example .env
-# .env 파일을 편집하여 설정을 변경하세요
+# 필수
+OPENAI_API_KEY=sk-...
+FINNHUB_API=your_finnhub_api_key
+
+# 선택 (폴백)
+ANTHROPIC_API_KEY=sk-ant-...
+
+# 선택 (결제)
+POLAR_ACCESS_TOKEN=your_polar_token
+POLAR_PRODUCT_ID=your_product_id
+
+# 설정
+LLM_PRIMARY_PROVIDER=openai
+API_PORT=8000
 ```
 
-4. 인프라 서비스 시작:
-```bash
-docker-compose up -d
-```
+### 4. 서버 실행
 
-5. 서버 실행:
 ```bash
 python main.py
 ```
 
-### 방법 2: Docker 없이 로컬 테스트
-
-Docker를 사용하지 않고 로컬 환경에서 테스트하려면 [TESTING_WITHOUT_DOCKER.md](./TESTING_WITHOUT_DOCKER.md)를 참조하세요.
-
-**빠른 시작:**
-1. 로컬에 Redis 설치 및 실행
-2. `.env` 파일 생성 (env.example 참조)
-3. `python test_components.py`로 컴포넌트 테스트
-4. `python main.py`로 서버 실행
-
-## 테스트
-
-### 컴포넌트 테스트
-```bash
-python test_components.py
-```
-
-### WebSocket 리스너 테스트
-```bash
-# 터미널 1: 서버 시작
-python main.py
-
-# 터미널 2: 리스너 테스트
-python test_listener.py
-```
+서버: `http://localhost:8000`
 
 ## API 엔드포인트
 
-- `GET /health` - 헬스 체크 엔드포인트
-- `WS /ws/prices` - 실시간 가격 WebSocket 스트림
+| Method | Endpoint | 설명 |
+|--------|----------|------|
+| GET | `/health` | 헬스 체크 |
+| POST | `/api/analysis/stock` | 주식 분석 실행 |
+| GET | `/api/analysis/latest` | 최신 분석 조회 |
+| GET | `/api/analysis/history` | 분석 히스토리 |
+| GET | `/api/analysis/search/stock` | 종목 검색 |
+| GET | `/api/analysis/{id}` | 분석 상세 조회 |
+| POST | `/api/payment/checkout` | 결제 세션 생성 |
+| GET | `/api/payment/checkout/{id}/status` | 결제 상태 조회 |
+| GET | `/api/payment/checkout/{id}/verify` | 결제 검증 |
 
-## 환경 변수
+## API 문서
 
-사용 가능한 설정 옵션은 `env.example` 파일을 참조하세요.
+- Swagger UI: `http://localhost:8000/docs`
+- ReDoc: `http://localhost:8000/redoc`
 
+## 데이터베이스
+
+SQLite를 사용하며 `stock_insights.db` 파일이 자동 생성됩니다.
+
+### 초기화
+
+```bash
+rm stock_insights.db
+```
+
+## 프로젝트 구조
+
+```
+backend/
+├── main.py                     # FastAPI 진입점
+├── app/
+│   ├── core/
+│   │   ├── config.py           # 환경 설정
+│   │   └── database.py         # DB 연결
+│   ├── models/
+│   │   └── stock_insight.py    # 데이터 모델
+│   ├── routers/
+│   │   ├── analysis.py         # 분석 API
+│   │   └── payment.py          # 결제 API
+│   ├── schemas/
+│   │   └── analysis.py         # Pydantic 스키마
+│   └── services/
+│       ├── stock_insight_engine.py  # AI 분석 엔진
+│       ├── stock_data_service.py    # 주식 데이터
+│       ├── payment_service.py       # 결제 서비스
+│       ├── prompts.py               # LLM 프롬프트
+│       └── response_parser.py       # 응답 파싱
+└── requirements.txt
+```
+
+## 지원 시장
+
+| 시장 | 데이터 소스 | 예시 |
+|------|-------------|------|
+| US | Finnhub API | AAPL, GOOGL, MSFT |
+| KR | yfinance | 삼성전자, 005930.KS |
+
+## 문제 해결
+
+### SSL 인증서 오류
+
+회사 네트워크 환경에서 `verify=False`가 이미 적용되어 있습니다.
+
+### API 키 미설정
+
+```
+OPENAI_API_KEY가 설정되지 않았습니다
+```
+
+`.env` 파일에 API 키를 올바르게 설정하세요.
