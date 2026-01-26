@@ -31,7 +31,7 @@ class Settings(BaseSettings):
 
     # OpenAI API 설정 (주식 분석용)
     OPENAI_API_KEY: str = ""
-    OPENAI_DEFAULT_MODEL: str = "gpt-4o-mini"
+    OPENAI_DEFAULT_MODEL: str = "gpt-5-mini"
 
     # Anthropic API 설정 (주식 분석용)
     ANTHROPIC_API_KEY: str = ""

@@ -67,8 +67,7 @@ class StockInsightEngine:
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_prompt}
             ],
-            max_tokens=4000,
-            temperature=0.3,
+            max_completion_tokens=4000,
             response_format={"type": "json_object"}
         )
         return response.choices[0].message.content
