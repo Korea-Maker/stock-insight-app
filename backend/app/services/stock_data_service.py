@@ -1,7 +1,7 @@
 """
 주식 데이터 서비스
 - 미국 주식: Finnhub API
-- 한국 주식: yfinance (Yahoo Finance)
+- 한국 주식: yfinance (Yahoo Finance) + pykrx (종목 검색)
 """
 import os
 import logging
@@ -17,6 +17,7 @@ import yfinance as yf
 import pandas as pd
 
 from app.core.config import settings
+from app.services.kr_stock_cache import kr_stock_cache
 
 # SSL 경고 비활성화
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
@@ -151,36 +152,42 @@ class StockDataService:
         """API 키를 settings에서 동적으로 가져옴"""
         return settings.FINNHUB_API
 
-    def resolve_stock_code(self, query: str) -> tuple[str, str]:
+    async def resolve_stock_code(self, query: str) -> tuple[str, str]:
         """
-        종목명/코드를 심볼로 변환
+        종목명/코드를 심볼로 변환 (pykrx 캐시 활용)
 
         Args:
-            query: 종목명 또는 코드 (예: "애플", "AAPL", "005930.KS")
+            query: 종목명 또는 코드 (예: "애플", "AAPL", "005930.KS", "현대글로비스")
 
         Returns:
             (symbol, market) 튜플
         """
         query = query.strip()
 
-        # 한국 종목 형식인 경우
+        # 한국 종목 형식인 경우 (.KS, .KQ 접미사)
         if query.endswith(".KS") or query.endswith(".KQ"):
             return query, "KR"
 
-        # 한국 종목명 매핑
+        # 하드코딩된 한국 종목명 매핑 (빠른 조회용)
         if query in KR_STOCK_MAPPING:
             return KR_STOCK_MAPPING[query], "KR"
 
-        # 미국 종목명 매핑
+        # 하드코딩된 미국 종목명 매핑
         if query in US_STOCK_MAPPING:
             return US_STOCK_MAPPING[query], "US"
 
-        # 숫자로만 구성된 경우 한국 종목 코드로 판단 (기본: 코스피)
+        # pykrx 캐시에서 한국 종목 검색 (이름 또는 코드)
+        kr_result = await kr_stock_cache.resolve_code(query)
+        if kr_result:
+            return kr_result
+
+        # 숫자로만 구성된 경우 한국 종목 코드로 판단
         if query.isdigit():
             code = query.zfill(6)
-            # 일부 코스닥 종목 패턴 (3으로 시작하는 6자리 등)
-            # 기본적으로 코스피로 처리, 실패 시 코스닥 시도
-            return f"{code}.KS", "KR"
+            # pykrx 캐시에서 시장 구분 조회 (KOSPI/KOSDAQ)
+            market_type = await kr_stock_cache.get_market(code)
+            suffix = ".KS" if market_type == "KOSPI" else ".KQ"
+            return f"{code}{suffix}", "KR"
 
         # 영문 대문자로만 구성된 경우 미국 종목으로 판단
         if query.isupper() and query.isalpha():
@@ -314,7 +321,7 @@ class StockDataService:
 
         try:
             # yfinance는 동기 API이므로 ThreadPoolExecutor 사용
-            loop = asyncio.get_event_loop()
+            loop = asyncio.get_running_loop()
             result = await loop.run_in_executor(
                 self._executor,
                 self._fetch_yfinance_sync,
@@ -373,8 +380,8 @@ class StockDataService:
         Returns:
             StockData 또는 None
         """
-        # 심볼 정규화 및 마켓 판별
-        resolved_symbol, market = self.resolve_stock_code(symbol)
+        # 심볼 정규화 및 마켓 판별 (async)
+        resolved_symbol, market = await self.resolve_stock_code(symbol)
 
         # 한국 주식은 yfinance 사용
         if market == "KR":
@@ -472,7 +479,7 @@ class StockDataService:
 
     async def search_stock(self, query: str) -> List[Dict[str, Any]]:
         """
-        종목 검색
+        종목 검색 (pykrx 캐시 + Finnhub API)
 
         Args:
             query: 검색어
@@ -482,16 +489,23 @@ class StockDataService:
         """
         results = []
 
-        # 한국 종목 매핑에서 검색
-        for name, code in KR_STOCK_MAPPING.items():
-            if query.lower() in name.lower():
-                results.append({
-                    "symbol": code,
-                    "name": name,
-                    "market": "KR",
-                })
+        # 1. pykrx 캐시에서 한국 종목 검색 (전체 KOSPI/KOSDAQ)
+        try:
+            kr_results = await kr_stock_cache.search(query, limit=10)
+            results.extend(kr_results)
+            logger.debug(f"pykrx 캐시 검색 결과: {len(kr_results)}개")
+        except Exception as e:
+            logger.warning(f"pykrx 캐시 검색 실패: {e}")
+            # 폴백: 하드코딩된 매핑에서 검색
+            for name, code in KR_STOCK_MAPPING.items():
+                if query.lower() in name.lower():
+                    results.append({
+                        "symbol": code,
+                        "name": name,
+                        "market": "KR",
+                    })
 
-        # 미국 종목 매핑에서 검색
+        # 2. 하드코딩된 미국 종목 매핑에서 검색 (한글 검색 지원)
         for name, code in US_STOCK_MAPPING.items():
             if query.lower() in name.lower() or query.upper() == code:
                 results.append({
@@ -500,8 +514,8 @@ class StockDataService:
                     "market": "US",
                 })
 
-        # Finnhub Symbol Search API 사용
-        if len(results) < 5:
+        # 3. Finnhub Symbol Search API 사용 (미국 주식 추가 검색)
+        if len([r for r in results if r["market"] == "US"]) < 5:
             search_result = await self._fetch_finnhub("search", {"q": query})
             if search_result and "result" in search_result:
                 for item in search_result["result"][:10]:
