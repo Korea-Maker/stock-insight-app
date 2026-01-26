@@ -1,687 +1,311 @@
-# Frontend Components 문서
+# Frontend Components
 
-QuantBoard V1 프론트엔드 컴포넌트에 대한 상세 문서입니다.
+Stock Insight App의 React 컴포넌트 구조 문서입니다.
 
-## 목차
-
-- [개요](#개요)
-- [폴더 구조](#폴더-구조)
-- [UI 컴포넌트](#ui-컴포넌트)
-- [테마 컴포넌트](#테마-컴포넌트)
-- [네비게이션 컴포넌트](#네비게이션-컴포넌트)
-- [차트 컴포넌트](#차트-컴포넌트)
-- [인증 컴포넌트](#인증-컴포넌트)
-- [커뮤니티 컴포넌트](#커뮤니티-컴포넌트)
-- [레이아웃 컴포넌트](#레이아웃-컴포넌트)
-- [의존성 그래프](#의존성-그래프)
-
----
-
-## 개요
-
-### 기술 스택
-
-| 기술 | 버전 | 용도 |
-|------|------|------|
-| React | 19 | UI 라이브러리 |
-| Next.js | 16 | 프레임워크 (App Router) |
-| TypeScript | - | 타입 안전성 |
-| Tailwind CSS | 4 | 스타일링 |
-| shadcn/ui | - | UI 컴포넌트 라이브러리 |
-| lucide-react | - | 아이콘 |
-| framer-motion | - | 애니메이션 |
-| lightweight-charts | v5 | 트레이딩 차트 |
-
-### 상태 관리
-
-- **Zustand**: 전역 상태 관리 (Redux 사용 금지)
-- **React Context**: 테마 관리
-
----
-
-## 폴더 구조
+## 디렉토리 구조
 
 ```
 frontend/components/
-├── ui/                    # shadcn/ui 기본 컴포넌트
-│   ├── button.tsx
-│   ├── card.tsx
-│   ├── checkbox.tsx
-│   └── input.tsx
-├── Theme/                 # 테마 관리
-│   ├── ThemeProvider.tsx
-│   └── ThemeToggle.tsx
-├── Header/                # 헤더 섹션
-│   └── MarketTicker.tsx
-├── Navigation/            # 네비게이션
-│   └── TopNav.tsx
-├── Chart/                 # 트레이딩 차트 (핵심)
-│   ├── CryptoChart.tsx
-│   ├── TradingChart.tsx
-│   ├── ChartControls.tsx
-│   └── IndicatorSettingsPanel.tsx
-├── Dashboard/             # 대시보드
-│   └── Sidebar.tsx
-├── Layout/                # 레이아웃
-│   └── MainLayout.tsx
-├── Auth/                  # 인증
-│   ├── AuthGuard.tsx
-│   ├── LoginForm.tsx
-│   ├── RegisterForm.tsx
-│   └── SocialLoginButtons.tsx
-├── Community/             # 커뮤니티
-│   ├── PostCard.tsx
-│   └── CommentSection.tsx
-└── DevTools/              # 개발 도구
-    └── VibeKanbanCompanion.tsx
+├── Analysis/                    # 분석 결과 관련
+│   ├── AnalysisForm.tsx         # 분석 요청 폼
+│   ├── AnalysisResult.tsx       # 분석 결과 표시
+│   ├── AnalysisHistory.tsx      # 분석 히스토리 목록
+│   ├── RecommendationBadge.tsx  # 투자 의사결정 뱃지
+│   ├── RiskGauge.tsx            # 위험도 게이지
+│   └── SectionCard.tsx          # 섹션 카드 래퍼
+├── Stock/                       # 종목 입력 관련
+│   ├── StockInput.tsx           # 종목 검색/입력
+│   └── TimeframePicker.tsx      # 투자 기간 선택
+├── Layout/                      # 레이아웃
+│   └── MainLayout.tsx           # 메인 레이아웃
+├── Navigation/                  # 네비게이션
+│   └── TopNav.tsx               # 상단 네비게이션
+├── Theme/                       # 테마 관련
+│   ├── ThemeProvider.tsx        # 테마 컨텍스트
+│   └── ThemeToggle.tsx          # 다크/라이트 토글
+├── Legal/                       # 법적 고지
+│   └── Disclaimer.tsx           # 투자 면책 조항
+└── ui/                          # shadcn/ui 컴포넌트
+    ├── badge.tsx
+    ├── button.tsx
+    ├── card.tsx
+    ├── checkbox.tsx
+    ├── input.tsx
+    ├── skeleton.tsx
+    └── tabs.tsx
 ```
 
 ---
 
-## UI 컴포넌트
+## Analysis 컴포넌트
 
-### Button
+### AnalysisForm
 
-**파일:** `components/ui/button.tsx`
+분석 요청 폼 컴포넌트입니다.
 
-CVA(Class Variance Authority) 기반 버튼 컴포넌트
+**위치:** `components/Analysis/AnalysisForm.tsx`
 
-```typescript
-interface ButtonProps extends React.ComponentProps<"button"> {
-  variant?: 'default' | 'destructive' | 'outline' | 'secondary' | 'ghost' | 'link';
-  size?: 'default' | 'sm' | 'lg' | 'icon';
-  asChild?: boolean;
+**기능:**
+- 종목코드/회사명 입력 (StockInput 사용)
+- 투자 기간 선택 (TimeframePicker 사용)
+- 분석 요청 제출
+- 로딩 상태 표시
+
+**사용:**
+```tsx
+import { AnalysisForm } from '@/components/Analysis/AnalysisForm'
+
+<AnalysisForm onSubmit={handleAnalysis} />
+```
+
+### AnalysisResult
+
+분석 결과를 표시하는 메인 컴포넌트입니다.
+
+**위치:** `components/Analysis/AnalysisResult.tsx`
+
+**기능:**
+- 딥리서치 분석 내용 표시
+- 투자 의사결정 (RecommendationBadge)
+- 위험도 게이지 (RiskGauge)
+- 시장 현황, 심리, 촉매 등 섹션별 표시
+
+**Props:**
+```tsx
+interface AnalysisResultProps {
+  insight: StockInsight
 }
 ```
 
-**사용 예시:**
+### AnalysisHistory
+
+분석 히스토리 목록 컴포넌트입니다.
+
+**위치:** `components/Analysis/AnalysisHistory.tsx`
+
+**기능:**
+- 이전 분석 목록 표시
+- 페이지네이션
+- 종목별 필터링
+- 상세 페이지 링크
+
+### RecommendationBadge
+
+투자 의사결정을 뱃지로 표시합니다.
+
+**위치:** `components/Analysis/RecommendationBadge.tsx`
+
+**Props:**
 ```tsx
-<Button variant="default" size="lg">클릭</Button>
-<Button variant="outline" size="icon"><Icon /></Button>
-<Button asChild><Link href="/path">링크</Link></Button>
+interface RecommendationBadgeProps {
+  recommendation: 'strong_buy' | 'buy' | 'hold' | 'sell' | 'strong_sell'
+}
 ```
 
-**Variants:**
-| Variant | 설명 |
-|---------|------|
-| `default` | 기본 스타일 (primary) |
-| `destructive` | 삭제/위험 액션 (빨간색) |
-| `outline` | 테두리만 있는 스타일 |
-| `secondary` | 보조 스타일 |
-| `ghost` | 배경 없는 스타일 |
-| `link` | 링크 스타일 |
+**색상 매핑:**
+| 의사결정 | 색상 |
+|----------|------|
+| strong_buy | 초록색 (진한) |
+| buy | 초록색 |
+| hold | 회색 |
+| sell | 빨간색 |
+| strong_sell | 빨간색 (진한) |
 
----
+### RiskGauge
 
-### Card
+위험도를 시각적 게이지로 표시합니다.
 
-**파일:** `components/ui/card.tsx`
+**위치:** `components/Analysis/RiskGauge.tsx`
 
-카드 레이아웃 컴포넌트 (5개 하위 컴포넌트)
-
-```typescript
-// 기본 사용
-<Card>
-  <CardHeader>
-    <CardTitle>제목</CardTitle>
-    <CardDescription>설명</CardDescription>
-  </CardHeader>
-  <CardContent>
-    본문 내용
-  </CardContent>
-  <CardFooter>
-    푸터
-  </CardFooter>
-</Card>
+**Props:**
+```tsx
+interface RiskGaugeProps {
+  score: number  // 1-10
+}
 ```
 
----
+**색상 단계:**
+- 1-3: 초록색 (저위험)
+- 4-6: 노란색 (중위험)
+- 7-10: 빨간색 (고위험)
 
-### Input
+### SectionCard
 
-**파일:** `components/ui/input.tsx`
+분석 결과 섹션을 감싸는 카드 컴포넌트입니다.
 
-기본 텍스트 입력 컴포넌트
+**위치:** `components/Analysis/SectionCard.tsx`
 
-```typescript
-interface InputProps extends React.ComponentProps<"input"> {}
+**Props:**
+```tsx
+interface SectionCardProps {
+  title: string
+  children: React.ReactNode
+}
 ```
 
 ---
 
-### Checkbox
+## Stock 컴포넌트
 
-**파일:** `components/ui/checkbox.tsx`
+### StockInput
 
-Radix UI 기반 체크박스
+종목 검색 및 입력 컴포넌트입니다.
 
-```typescript
-<Checkbox checked={checked} onCheckedChange={setChecked} />
+**위치:** `components/Stock/StockInput.tsx`
+
+**기능:**
+- 자동완성 검색
+- 한국/미국 종목 지원
+- 검색 결과 드롭다운
+- 키보드 네비게이션
+
+**Props:**
+```tsx
+interface StockInputProps {
+  value: string
+  onChange: (value: string) => void
+  onSelect?: (stock: StockSearchResult) => void
+}
+```
+
+### TimeframePicker
+
+투자 기간 선택 컴포넌트입니다.
+
+**위치:** `components/Stock/TimeframePicker.tsx`
+
+**옵션:**
+| 값 | 라벨 | 설명 |
+|----|------|------|
+| short | 단기 | 1-3개월 |
+| mid | 중기 | 3-12개월 |
+| long | 장기 | 1년+ |
+
+**Props:**
+```tsx
+interface TimeframePickerProps {
+  value: InvestmentTimeframe
+  onChange: (timeframe: InvestmentTimeframe) => void
+}
 ```
 
 ---
 
-## 테마 컴포넌트
+## Layout 컴포넌트
+
+### MainLayout
+
+메인 레이아웃 컴포넌트입니다.
+
+**위치:** `components/Layout/MainLayout.tsx`
+
+**구조:**
+```
+┌─────────────────────────────────┐
+│           TopNav                │
+├─────────────────────────────────┤
+│                                 │
+│           children              │
+│                                 │
+├─────────────────────────────────┤
+│           Disclaimer            │
+└─────────────────────────────────┘
+```
+
+**사용:**
+```tsx
+import { MainLayout } from '@/components/Layout/MainLayout'
+
+<MainLayout>
+  <YourContent />
+</MainLayout>
+```
+
+---
+
+## Navigation 컴포넌트
+
+### TopNav
+
+상단 네비게이션 바입니다.
+
+**위치:** `components/Navigation/TopNav.tsx`
+
+**요소:**
+- 로고/앱 이름
+- 메뉴 링크 (홈, 대시보드, 히스토리)
+- 테마 토글 (ThemeToggle)
+
+---
+
+## Theme 컴포넌트
 
 ### ThemeProvider
 
-**파일:** `components/Theme/ThemeProvider.tsx`
+테마 컨텍스트 프로바이더입니다.
 
-Context API 기반 테마 관리자
-
-```typescript
-interface ThemeProviderProps {
-  children: React.ReactNode;
-  defaultTheme?: 'light' | 'dark' | 'system';
-}
-
-// 제공하는 컨텍스트
-interface ThemeContextType {
-  theme: 'light' | 'dark' | 'system';
-  resolvedTheme: 'light' | 'dark';
-  setTheme: (theme: 'light' | 'dark' | 'system') => void;
-}
-```
+**위치:** `components/Theme/ThemeProvider.tsx`
 
 **기능:**
-- localStorage에 테마 저장
-- 시스템 다크모드 자동 감지
-- HTML root에 class 적용 (light/dark)
+- 다크/라이트 모드 관리
+- localStorage 저장
+- 시스템 설정 감지
 
 **사용:**
 ```tsx
 // app/layout.tsx
-<ThemeProvider defaultTheme="system">
-  {children}
+import { ThemeProvider } from '@/components/Theme/ThemeProvider'
+
+<ThemeProvider>
+  <App />
 </ThemeProvider>
-
-// 컴포넌트에서
-const { theme, setTheme } = useTheme();
 ```
-
----
 
 ### ThemeToggle
 
-**파일:** `components/Theme/ThemeToggle.tsx`
+테마 전환 버튼입니다.
 
-테마 전환 버튼
-
-```typescript
-// Props 없음 - useTheme 훅 사용
-```
-
-**아이콘:** Sun, Moon, Monitor (lucide-react)
-
----
-
-## 네비게이션 컴포넌트
-
-### TopNav
-
-**파일:** `components/Navigation/TopNav.tsx`
-
-전역 상단 네비게이션 바
-
-```typescript
-// Props 없음 - 내부 상태 사용
-// 사용하는 훅:
-// - usePathname() - 현재 경로
-// - useRouter() - 라우팅
-// - useAuthStore() - 인증 상태
-```
-
-**구성:**
-1. **로고 + 브랜드명** (Zerocoke)
-2. **Navigation Items:**
-   - 대시보드 (`/dashboard`)
-   - 속보 (`/news`)
-   - 커뮤니티 (`/community`)
-3. **ThemeToggle**
-4. **Auth Section:**
-   - 미인증: 로그인 버튼
-   - 인증됨: 프로필 + 로그아웃
-
-**애니메이션:**
-- `framer-motion`으로 진입 애니메이션 (y: -100 → 0)
-- Shared Layout Animation으로 active 표시
-
----
-
-### MarketTicker
-
-**파일:** `components/Header/MarketTicker.tsx`
-
-실시간 BTC/USDT 가격 표시
-
-```typescript
-// Props 없음 - Zustand 스토어 직접 구독
-// usePriceStore에서:
-// - currentPrice
-// - connectionStatus
-// - priceHistory
-```
+**위치:** `components/Theme/ThemeToggle.tsx`
 
 **기능:**
-- 가격 방향 감지 (상승/하락) → 색상 변경
-- WebSocket 연결 상태 표시
-- 가격 포맷팅 (`Intl.NumberFormat`)
+- 현재 테마 아이콘 표시 (해/달)
+- 클릭 시 테마 전환
+- 애니메이션 효과
 
 ---
 
-## 차트 컴포넌트
+## Legal 컴포넌트
 
-### CryptoChart
+### Disclaimer
 
-**파일:** `components/Chart/CryptoChart.tsx`
+투자 면책 조항을 표시합니다.
 
-간단한 캔들스틱 차트 (500개 캔들)
+**위치:** `components/Legal/Disclaimer.tsx`
 
-```typescript
-// Props 없음
-// Refs:
-// - chartContainerRef: HTMLDivElement
-// - chartRef: IChartApi
-// - candlestickSeriesRef: ISeriesApi<'Candlestick'>
-// - volumeSeriesRef: ISeriesApi<'Histogram'>
-// - ma20SeriesRef, ma50SeriesRef: ISeriesApi<'Line'>
-```
-
-**기능:**
-- 캔들스틱 + 거래량 히스토그램
-- MA20/MA50 이동평균선
-- REST API로 초기 캔들 데이터 로드
-- Zustand 구독으로 실시간 업데이트
-
-**API 호출:**
-```
-GET /api/candles?symbol=BTCUSDT&interval=1m&limit=500
-```
+**내용:**
+- 투자 조언이 아님을 명시
+- AI 분석의 한계 설명
+- 투자 결정은 본인 책임
 
 ---
 
-### TradingChart
-
-**파일:** `components/Chart/TradingChart.tsx`
-
-고급 트레이딩 차트 (가장 복잡한 컴포넌트, 1500+ 줄)
-
-```typescript
-// Props 없음
-// 상태: useChartStore (Zustand)
-```
-
-**지원 지표 (14개):**
-
-| 오버레이 지표 | 오실레이터 |
-|--------------|-----------|
-| Moving Averages (SMA/EMA) | RSI |
-| Ichimoku Cloud | MACD |
-| Bollinger Bands | Stochastic |
-| VWAP | ATR |
-| Supertrend | ADX |
-| EMA Ribbon | OBV |
-| Parabolic SAR | - |
-| Volume | - |
-
-**차트 구조:**
-```
-Main Container
-├─ Main Chart (캔들 + 오버레이 지표)
-├─ RSI Chart (서브패널, optional)
-├─ MACD Chart (서브패널, optional)
-├─ Stochastic Chart (서브패널, optional)
-├─ ATR Chart (서브패널, optional)
-├─ ADX Chart (서브패널, optional)
-└─ OBV Chart (서브패널, optional)
-```
-
-**주요 Refs:**
-```typescript
-// 메인 차트
-mainContainerRef, chartRef
-candleSeriesRef, volumeSeriesRef
-
-// 이동평균
-maSeriesRefs: MASeriesRef[]
-
-// Ichimoku
-ichimokuRefs: IchimokuSeriesRefs
-
-// 서브 차트들
-rsiContainerRef, macdContainerRef, ...
-
-// 오버레이 지표
-overlaySeriesRef: OverlaySeriesRefs
-```
-
----
-
-### ChartControls
-
-**파일:** `components/Chart/ChartControls.tsx`
-
-차트 제어 패널
-
-```typescript
-interface ChartControlsProps {
-  symbol: string;
-  interval: TimeInterval;
-  onSymbolChange: (symbol: string) => void;
-  onIntervalChange: (interval: TimeInterval) => void;
-  onOpenSettings: () => void;
-  activeDrawingTool: DrawingToolType | null;
-}
-```
-
-**기능:**
-- 5개 심볼 버튼 (BTC, ETH, SOL, BNB, XRP)
-- 6개 시간 간격 버튼 (1m, 5m, 15m, 1h, 4h, 1d)
-- 그리기 도구 (수평선, 추세선)
-- 지표 설정 패널 열기 버튼
-
----
-
-### IndicatorSettingsPanel
-
-**파일:** `components/Chart/IndicatorSettingsPanel.tsx`
-
-지표 설정 우측 슬라이드 패널
-
-```typescript
-interface IndicatorSettingsPanelProps {
-  isOpen: boolean;
-  onClose: () => void;
-}
-```
-
-**3개 탭:**
-1. **Overlays**: MA, Ichimoku, BB, VWAP, Supertrend, EMA Ribbon, PSAR
-2. **Oscillators**: RSI, MACD, Stochastic, ATR, ADX, OBV
-3. **Drawing**: 드로잉 도구, 색상 선택
-
-**내부 컴포넌트:**
-- `Section`: 접을 수 있는 섹션
-- `MAConfigRow`: 이동평균 설정 행
-- `RSIConfigRow`: RSI 설정 행
-- `DrawingToolButton`: 드로잉 도구 버튼
-
----
-
-## 인증 컴포넌트
-
-### AuthGuard
-
-**파일:** `components/Auth/AuthGuard.tsx`
-
-인증 보호 래퍼
-
-```typescript
-interface AuthGuardProps {
-  children: React.ReactNode;
-  fallback?: React.ReactNode;
-}
-```
-
-**동작:**
-1. 초기 로드 시 `checkAuth()` 호출
-2. 로딩 중: fallback 또는 스피너 표시
-3. 미인증: `/auth/login`으로 리다이렉트
-4. 인증됨: children 렌더
-
----
-
-### LoginForm
-
-**파일:** `components/Auth/LoginForm.tsx`
-
-로그인 폼
-
-```typescript
-// Props 없음
-// 내부 상태:
-// - email, password, error, isLoading
-```
-
-**기능:**
-- 이메일/비밀번호 입력
-- `useAuthStore().login()` 호출
-- 성공 시 `/community`로 리다이렉트
-
----
-
-### RegisterForm
-
-**파일:** `components/Auth/RegisterForm.tsx`
-
-회원가입 폼
-
-```typescript
-// Props 없음
-// 내부 상태:
-// - email, username, displayName, password, confirmPassword
-// - error, success, isLoading
-```
-
-**유효성 검사:**
-- 사용자명: 영문, 숫자, 언더스코어만
-- 비밀번호: 8자 이상, 대/소문자, 숫자 포함
-- 비밀번호 확인 일치
-
----
-
-### SocialLoginButtons
-
-**파일:** `components/Auth/SocialLoginButtons.tsx`
-
-OAuth 로그인 버튼
-
-```typescript
-// Props 없음
-```
-
-**버튼:**
-- Google OAuth
-- GitHub OAuth
-
----
-
-## 커뮤니티 컴포넌트
-
-### PostCard
-
-**파일:** `components/Community/PostCard.tsx`
-
-게시글 카드
-
-```typescript
-interface PostCardProps {
-  post: PostListItem;
-  onLike?: (postId: number) => void;
-}
-```
-
-**표시 정보:**
-- 작성자 아바타
-- 카테고리
-- 제목
-- 내용 미리보기
-- 태그 (`#` 표시)
-- 통계 (좋아요, 댓글, 조회수)
-- 작성 시간 (상대 시간)
-
-**인터랙션:**
-- 클릭: `/community/{postId}`로 이동
-- 좋아요 버튼: `onLike` 콜백
-
----
-
-### CommentSection
-
-**파일:** `components/Community/CommentSection.tsx`
-
-댓글 섹션 (트리 구조 지원)
-
-```typescript
-interface CommentSectionProps {
-  postId: number;
-}
-
-// 내부 상태:
-// - newComment, replyTo, replyContent, isSubmitting
-```
-
-**기능:**
-1. 댓글 작성 (인증된 사용자만)
-2. 댓글 목록 (재귀적 대댓글)
-3. 대댓글 작성 (답글 버튼)
-4. 댓글 삭제 (작성자만)
-5. 댓글 좋아요 (인증된 사용자만)
-
-**내부 컴포넌트: CommentItem**
-```typescript
-interface CommentItemProps {
-  comment: Comment;
-  currentUserId?: number;
-  isAuthenticated: boolean;
-  replyTo: number | null;
-  replyContent: string;
-  isSubmitting: boolean;
-  onReplyToChange: (id: number | null) => void;
-  onReplyContentChange: (content: string) => void;
-  onReply: (parentId: number) => void;
-  onDelete: (commentId: number) => void;
-  onLike: (commentId: number) => void;
-  isReply?: boolean;
-}
-```
-
----
-
-## 레이아웃 컴포넌트
-
-### MainLayout
-
-**파일:** `components/Layout/MainLayout.tsx`
-
-메인 레이아웃
-
-```typescript
-interface MainLayoutProps {
-  children: React.ReactNode;
-}
-```
-
-**구조:**
+## UI 컴포넌트 (shadcn/ui)
+
+shadcn/ui 기반의 재사용 가능한 UI 컴포넌트입니다.
+
+| 컴포넌트 | 용도 |
+|----------|------|
+| Badge | 라벨, 태그 |
+| Button | 버튼 |
+| Card | 카드 컨테이너 |
+| Checkbox | 체크박스 |
+| Input | 텍스트 입력 |
+| Skeleton | 로딩 스켈레톤 |
+| Tabs | 탭 네비게이션 |
+
+**사용:**
 ```tsx
-<div className="bg-background transition-colors">
-  <TopNav />
-  <main className="flex-1">
-    {/* 배경 효과 */}
-    <div className="fixed pointer-events-none">
-      {/* gradient blobs */}
-      {/* grid 패턴 */}
-    </div>
-    {/* 콘텐츠 */}
-    <motion.div className="z-10">
-      {children}
-    </motion.div>
-  </main>
-</div>
+import { Button } from '@/components/ui/button'
+import { Card, CardHeader, CardContent } from '@/components/ui/card'
+import { Input } from '@/components/ui/input'
 ```
-
-**특징:**
-- `useWebSocket()` 훅 초기화 (전역 WebSocket)
-- Framer Motion 애니메이션 (opacity + y 슬라이드)
-
----
-
-### Sidebar
-
-**파일:** `components/Dashboard/Sidebar.tsx`
-
-대시보드 사이드바
-
-```typescript
-// Props 없음
-```
-
-**기능:**
-- AI 모델 상태 표시 (오프라인)
-- 시스템 상태 (Ingestor, Analysis Engine)
-
----
-
-## 의존성 그래프
-
-```
-MainLayout
-├─ TopNav
-│  ├─ ThemeToggle
-│  │  └─ ThemeProvider (Context)
-│  └─ useAuthStore (Zustand)
-├─ useWebSocket (Global WebSocket)
-└─ {children}
-    ├─ Dashboard
-    │  ├─ TradingChart
-    │  │  ├─ ChartControls
-    │  │  ├─ IndicatorSettingsPanel
-    │  │  ├─ useChartStore
-    │  │  └─ usePriceStore
-    │  └─ Sidebar
-    ├─ News
-    └─ Community
-       ├─ PostCard[]
-       │  └─ usePriceStore
-       ├─ CommentSection
-       │  ├─ useAuthStore
-       │  └─ useCommunityStore
-       └─ AuthGuard (if protected)
-
-Auth Pages
-├─ LoginForm
-│  ├─ useAuthStore
-│  └─ SocialLoginButtons
-├─ RegisterForm
-│  ├─ useAuthStore
-│  └─ SocialLoginButtons
-```
-
----
-
-## 외부 라이브러리 사용
-
-### lucide-react 아이콘 (40개+)
-
-| 카테고리 | 아이콘 |
-|----------|--------|
-| UI | Settings2, Plus, Trash2, X, ChevronDown, ChevronRight, Minus, Edit2, Send |
-| 차트 | TrendingUp, BarChart3, LineChart, Activity, Layers |
-| 상태 | Heart, MessageSquare, Eye, Clock, Hash, Reply, Loader2, AlertCircle, CheckCircle |
-| 네비게이션 | LayoutDashboard, Newspaper, Users, BrainCircuit, LogIn, LogOut, User |
-| 방향 | ArrowUp, ArrowDown |
-| 기타 | Monitor, Sun, Moon, PenLine |
-
-### shadcn/ui 컴포넌트
-
-- Button
-- Card (+ Header, Title, Description, Content, Footer)
-- Checkbox
-- Input
-
-### framer-motion
-
-- TopNav: 진입 애니메이션, Shared Layout Animation
-- MainLayout: content 슬라이드
-
-### lightweight-charts (v5 API)
-
-- createChart
-- CandlestickSeries
-- HistogramSeries
-- LineSeries
-- createSeriesMarkers
-
----
-
-**Last Updated:** 2026-01-23
