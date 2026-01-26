@@ -18,6 +18,10 @@ interface AnalysisState {
   history: StockInsightSummary[];
   historyTotal: number;
 
+  // 결제 상태
+  checkoutId: string | null;
+  isCheckingOut: boolean;
+
   // Actions
   setStockCode: (code: string) => void;
   setTimeframe: (timeframe: InvestmentTimeframe) => void;
@@ -25,6 +29,8 @@ interface AnalysisState {
   setCurrentInsight: (insight: StockInsight | null) => void;
   setError: (error: string | null) => void;
   setHistory: (history: StockInsightSummary[], total: number) => void;
+  setCheckoutId: (checkoutId: string | null) => void;
+  setIsCheckingOut: (isCheckingOut: boolean) => void;
   reset: () => void;
 }
 
@@ -36,6 +42,8 @@ const initialState = {
   timeframe: 'mid' as InvestmentTimeframe,
   history: [],
   historyTotal: 0,
+  checkoutId: null,
+  isCheckingOut: false,
 };
 
 export const useAnalysisStore = create<AnalysisState>((set) => ({
@@ -47,5 +55,7 @@ export const useAnalysisStore = create<AnalysisState>((set) => ({
   setCurrentInsight: (insight) => set({ currentInsight: insight }),
   setError: (error) => set({ error }),
   setHistory: (history, total) => set({ history, historyTotal: total }),
+  setCheckoutId: (checkoutId) => set({ checkoutId }),
+  setIsCheckingOut: (isCheckingOut) => set({ isCheckingOut }),
   reset: () => set(initialState),
 }));

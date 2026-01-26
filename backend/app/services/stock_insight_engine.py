@@ -180,6 +180,11 @@ class StockInsightEngine:
             processing_time_ms = int((time.time() - start_time) * 1000)
 
             # 6. StockInsight 객체 생성
+            # 가격 변동률 (퍼센트) - pct 값 우선 사용
+            price_change_1d = stock_data.price_change_1d_pct if stock_data.price_change_1d_pct is not None else stock_data.price_change_1d
+            price_change_1w = stock_data.price_change_1w_pct if stock_data.price_change_1w_pct is not None else stock_data.price_change_1w
+            price_change_1m = stock_data.price_change_1m_pct if stock_data.price_change_1m_pct is not None else stock_data.price_change_1m
+
             insight = StockInsight(
                 stock_code=stock_data.symbol,
                 stock_name=stock_data.name,
@@ -192,9 +197,9 @@ class StockInsightEngine:
                 risk_score=parsed_response["risk_score"],
                 risk_analysis=parsed_response["risk_analysis"],
                 current_price=stock_data.current_price,
-                price_change_1d=stock_data.price_change_1d,
-                price_change_1w=stock_data.price_change_1w,
-                price_change_1m=stock_data.price_change_1m,
+                price_change_1d=price_change_1d,
+                price_change_1w=price_change_1w,
+                price_change_1m=price_change_1m,
                 market_overview=parsed_response["market_overview"],
                 market_sentiment=parsed_response["market_sentiment"],
                 sentiment_details=parsed_response["sentiment_details"],
