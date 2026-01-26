@@ -131,7 +131,8 @@ class StockInsightEngine:
     async def generate_insight(
         self,
         stock_code: str,
-        timeframe: str = "mid"
+        timeframe: str = "mid",
+        user_id: str = ""
     ) -> Optional[StockInsight]:
         """
         주식 딥리서치 분석 생성
@@ -139,6 +140,7 @@ class StockInsightEngine:
         Args:
             stock_code: 종목코드 또는 회사명 (예: "AAPL", "삼성전자", "005930.KS")
             timeframe: 투자 기간 (short, mid, long)
+            user_id: 사용자 식별자 (UUID v4)
 
         Returns:
             StockInsight 객체 또는 None
@@ -186,6 +188,7 @@ class StockInsightEngine:
             price_change_1m = stock_data.price_change_1m_pct if stock_data.price_change_1m_pct is not None else stock_data.price_change_1m
 
             insight = StockInsight(
+                user_id=user_id,
                 stock_code=stock_data.symbol,
                 stock_name=stock_data.name,
                 market=stock_data.market,
