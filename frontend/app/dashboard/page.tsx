@@ -1,7 +1,8 @@
 "use client";
 
+import { Suspense } from 'react';
 import { motion } from 'framer-motion';
-import { AlertCircle, BrainCircuit, History } from 'lucide-react';
+import { AlertCircle, BrainCircuit, History, Loader2 } from 'lucide-react';
 import { AnalysisForm, AnalysisResult, AnalysisHistory } from '@/components/Analysis';
 import { useAnalysisStore } from '@/store/useAnalysisStore';
 import { Card } from '@/components/ui/card';
@@ -49,7 +50,13 @@ export default function DashboardPage() {
         {/* Analysis Form */}
         <motion.div variants={item}>
           <Card className="p-6 lg:p-8 border-primary/20 bg-card/50 backdrop-blur-xl">
-            <AnalysisForm />
+            <Suspense fallback={
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+              </div>
+            }>
+              <AnalysisForm />
+            </Suspense>
           </Card>
         </motion.div>
 

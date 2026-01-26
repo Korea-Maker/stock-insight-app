@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { formatDistanceToNow, format } from 'date-fns';
 import { ko } from 'date-fns/locale';
+import { Disclaimer } from '@/components/Legal';
 
 /**
  * UTC 시간을 KST로 변환하고 포맷팅
@@ -283,10 +284,12 @@ export function AnalysisResult({ insight, className }: AnalysisResultProps) {
         )}
       </div>
 
+      {/* Disclaimer */}
+      <Disclaimer variant="compact" className="mt-6" />
+
       {/* Footer Metadata */}
-      <div className="flex items-center justify-between text-xs text-muted-foreground pt-4 border-t">
-        <span>AI 모델: {insight.ai_model || 'Unknown'}</span>
-        <span>처리 시간: {insight.processing_time_ms ? `${(insight.processing_time_ms / 1000).toFixed(1)}초` : '-'}</span>
+      <div className="flex items-center justify-end text-xs text-muted-foreground pt-4 border-t">
+        <span>분석 소요 시간: {insight.processing_time_ms ? `${(insight.processing_time_ms / 1000).toFixed(1)}초` : '-'}</span>
       </div>
     </div>
   );

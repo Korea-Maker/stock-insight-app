@@ -33,6 +33,9 @@ NUL
 *.swp
 *.swo
 
+# MCP Configuration (contains API keys)
+.mcp.json
+
 # Python
 __pycache__/
 *.py[cod]

@@ -49,6 +49,11 @@ class Settings(BaseSettings):
     # Finnhub API 설정 (주식 데이터)
     FINNHUB_API: str = ""
 
+    # Polar 결제 설정
+    POLAR_API_KEY: str = ""
+    POLAR_BASE_URL: str = "https://sandbox-api.polar.sh/v1"
+    POLAR_PRODUCT_ID: str = ""
+
     # LLM 파이프라인 설정
     LLM_PRIMARY_PROVIDER: str = "openai"  # openai, anthropic, google, azure_openai
     LLM_FALLBACK_ORDER: str = "openai,anthropic"  # 쉼표 구분 폴백 순서

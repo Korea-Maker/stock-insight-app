@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { LayoutDashboard, BrainCircuit, History } from 'lucide-react';
+import { LayoutDashboard, BrainCircuit, History, Home } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ThemeToggle } from '@/components/Theme/ThemeToggle';
 import { motion } from 'framer-motion';
@@ -14,6 +14,11 @@ interface NavItem {
 }
 
 const navItems: NavItem[] = [
+  {
+    title: '홈',
+    href: '/',
+    icon: Home,
+  },
   {
     title: '분석',
     href: '/dashboard',
@@ -53,8 +58,7 @@ export function TopNav(): React.ReactElement {
         <nav className="flex items-center gap-1">
           {navItems.map((item) => {
             const Icon = item.icon;
-            const isActive = pathname === item.href ||
-              (item.href === '/dashboard' && pathname === '/');
+            const isActive = pathname === item.href;
 
             return (
               <Link

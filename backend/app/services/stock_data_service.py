@@ -1,15 +1,20 @@
 """
-Finnhub 기반 주식 데이터 서비스
-미국 주식 데이터 조회 (SSL 검증 비활성화)
+주식 데이터 서비스
+- 미국 주식: Finnhub API
+- 한국 주식: yfinance (Yahoo Finance)
 """
 import os
 import logging
 import urllib3
 from dataclasses import dataclass
 from typing import Optional, List, Dict, Any
-from datetime import datetime
+from datetime import datetime, timedelta
+import asyncio
+from concurrent.futures import ThreadPoolExecutor
 
 import httpx
+import yfinance as yf
+import pandas as pd
 
 from app.core.config import settings
 
@@ -22,8 +27,9 @@ logger = logging.getLogger(__name__)
 FINNHUB_API_KEY = settings.FINNHUB_API
 FINNHUB_BASE_URL = "https://finnhub.io/api/v1"
 
-# 한국 주요 종목 코드 매핑 (Finnhub은 미국 주식만 지원하므로 참고용)
+# 한국 주요 종목 코드 매핑 (yfinance 지원)
 KR_STOCK_MAPPING = {
+    # 시가총액 상위
     "삼성전자": "005930.KS",
     "SK하이닉스": "000660.KS",
     "LG에너지솔루션": "373220.KS",
@@ -39,6 +45,52 @@ KR_STOCK_MAPPING = {
     "LG화학": "051910.KS",
     "삼성SDI": "006400.KS",
     "현대모비스": "012330.KS",
+    # IT/플랫폼
+    "카카오뱅크": "323410.KS",
+    "카카오페이": "377300.KS",
+    "크래프톤": "259960.KS",
+    "엔씨소프트": "036570.KS",
+    "넷마블": "251270.KS",
+    # 반도체/전자
+    "삼성전기": "009150.KS",
+    "DB하이텍": "000990.KS",
+    "리노공업": "058470.KS",
+    "원익IPS": "240810.KS",
+    # 2차전지/소재
+    "에코프로비엠": "247540.KS",
+    "에코프로": "086520.KS",
+    "포스코퓨처엠": "003670.KS",
+    "엘앤에프": "066970.KS",
+    # 바이오/헬스케어
+    "삼성바이오에피스": "326030.KS",
+    "유한양행": "000100.KS",
+    "녹십자": "006280.KS",
+    "한미약품": "128940.KS",
+    # 금융
+    "하나금융지주": "086790.KS",
+    "우리금융지주": "316140.KS",
+    "삼성생명": "032830.KS",
+    "삼성화재": "000810.KS",
+    "미래에셋증권": "006800.KS",
+    # 자동차/부품
+    "현대위아": "011210.KS",
+    "만도": "204320.KS",
+    "한온시스템": "018880.KS",
+    # 에너지/유틸리티
+    "한국전력": "015760.KS",
+    "한국가스공사": "036460.KS",
+    "SK이노베이션": "096770.KS",
+    "S-Oil": "010950.KS",
+    # 건설/인프라
+    "삼성물산": "028260.KS",
+    "현대건설": "000720.KS",
+    "대우건설": "047040.KS",
+    # 코스닥 대표
+    "에코프로HN": "383310.KQ",
+    "알테오젠": "196170.KQ",
+    "HLB": "028300.KQ",
+    "셀트리온제약": "068760.KQ",
+    "펄어비스": "263750.KQ",
 }
 
 # 미국 주요 종목 (검색 편의용)
@@ -87,11 +139,12 @@ class StockData:
 
 
 class StockDataService:
-    """Finnhub 기반 주식 데이터 서비스"""
+    """주식 데이터 서비스 (US: Finnhub, KR: yfinance)"""
 
     def __init__(self):
         self.cache: Dict[str, tuple] = {}  # symbol -> (data, timestamp)
         self.cache_ttl = 300  # 5분
+        self._executor = ThreadPoolExecutor(max_workers=4)  # yfinance는 동기 API
 
     @property
     def api_key(self) -> str:
@@ -122,9 +175,12 @@ class StockDataService:
         if query in US_STOCK_MAPPING:
             return US_STOCK_MAPPING[query], "US"
 
-        # 숫자로만 구성된 경우 한국 종목 코드로 판단
+        # 숫자로만 구성된 경우 한국 종목 코드로 판단 (기본: 코스피)
         if query.isdigit():
-            return f"{query.zfill(6)}.KS", "KR"
+            code = query.zfill(6)
+            # 일부 코스닥 종목 패턴 (3으로 시작하는 6자리 등)
+            # 기본적으로 코스피로 처리, 실패 시 코스닥 시도
+            return f"{code}.KS", "KR"
 
         # 영문 대문자로만 구성된 경우 미국 종목으로 판단
         if query.isupper() and query.isalpha():
@@ -154,6 +210,159 @@ class StockDataService:
             logger.error(f"Finnhub API 호출 실패: {e}")
             return None
 
+    def _fetch_yfinance_sync(self, symbol: str) -> Optional[Dict[str, Any]]:
+        """yfinance 동기 호출 (ThreadPoolExecutor에서 실행)"""
+        try:
+            ticker = yf.Ticker(symbol)
+
+            # 기본 정보 - 다양한 fallback 시도
+            info = ticker.info or {}
+
+            # 현재가 조회 (여러 필드 시도)
+            current_price = (
+                info.get("regularMarketPrice") or
+                info.get("currentPrice") or
+                info.get("previousClose") or
+                info.get("open")
+            )
+
+            # 히스토리에서 현재가 시도
+            if not current_price:
+                try:
+                    hist = ticker.history(period="5d")
+                    if not hist.empty:
+                        current_price = float(hist["Close"].iloc[-1])
+                except Exception:
+                    pass
+
+            if not current_price:
+                logger.warning(f"yfinance: 현재가를 찾을 수 없음 - {symbol}")
+                return None
+
+            # 히스토리 데이터로 변동률 계산
+            try:
+                hist = ticker.history(period="1mo")
+            except Exception:
+                hist = pd.DataFrame()
+
+            price_change_1d_pct = None
+            price_change_1w_pct = None
+            price_change_1m_pct = None
+
+            if not hist.empty and len(hist) > 1:
+                try:
+                    latest_close = float(hist["Close"].iloc[-1])
+
+                    # 1일 변동
+                    if len(hist) >= 2:
+                        prev_close = float(hist["Close"].iloc[-2])
+                        if prev_close > 0:
+                            price_change_1d_pct = ((latest_close - prev_close) / prev_close) * 100
+
+                    # 1주 변동 (5 거래일)
+                    if len(hist) >= 6:
+                        week_ago = float(hist["Close"].iloc[-6])
+                        if week_ago > 0:
+                            price_change_1w_pct = ((latest_close - week_ago) / week_ago) * 100
+
+                    # 1개월 변동
+                    if len(hist) >= 2:
+                        month_ago = float(hist["Close"].iloc[0])
+                        if month_ago > 0:
+                            price_change_1m_pct = ((latest_close - month_ago) / month_ago) * 100
+                except Exception as e:
+                    logger.warning(f"yfinance: 가격 변동 계산 실패 - {symbol}: {e}")
+
+            # 종목명 (한국 종목은 shortName이 없을 수 있음)
+            name = (
+                info.get("shortName") or
+                info.get("longName") or
+                info.get("displayName") or
+                symbol.split(".")[0]  # .KS 제거
+            )
+
+            return {
+                "current_price": current_price,
+                "name": name,
+                "currency": info.get("currency", "KRW"),
+                "market_cap": info.get("marketCap"),
+                "pe_ratio": info.get("trailingPE") or info.get("forwardPE"),
+                "pb_ratio": info.get("priceToBook"),
+                "fifty_two_week_high": info.get("fiftyTwoWeekHigh"),
+                "fifty_two_week_low": info.get("fiftyTwoWeekLow"),
+                "beta": info.get("beta"),
+                "sector": info.get("sector"),
+                "industry": info.get("industry"),
+                "price_change_1d_pct": price_change_1d_pct,
+                "price_change_1w_pct": price_change_1w_pct,
+                "price_change_1m_pct": price_change_1m_pct,
+                "volume": info.get("volume") or info.get("regularMarketVolume"),
+                "avg_volume": info.get("averageVolume") or info.get("averageDailyVolume10Day"),
+            }
+        except Exception as e:
+            logger.error(f"yfinance 데이터 조회 실패 ({symbol}): {e}", exc_info=True)
+            return None
+
+    async def _get_kr_stock_data(self, symbol: str) -> Optional[StockData]:
+        """한국 주식 데이터 조회 (yfinance)"""
+        # 캐시 확인
+        if symbol in self.cache:
+            data, timestamp = self.cache[symbol]
+            if datetime.now().timestamp() - timestamp < self.cache_ttl:
+                logger.info(f"캐시된 데이터 사용 (KR): {symbol}")
+                return data
+
+        try:
+            # yfinance는 동기 API이므로 ThreadPoolExecutor 사용
+            loop = asyncio.get_event_loop()
+            result = await loop.run_in_executor(
+                self._executor,
+                self._fetch_yfinance_sync,
+                symbol
+            )
+
+            if not result:
+                logger.warning(f"yfinance 데이터 없음: {symbol}")
+                return None
+
+            stock_data = StockData(
+                symbol=symbol,
+                name=result["name"],
+                market="KR",
+                current_price=result["current_price"],
+                currency=result["currency"],
+                price_change_1d=None,
+                price_change_1d_pct=result.get("price_change_1d_pct"),
+                price_change_1w=None,
+                price_change_1w_pct=result.get("price_change_1w_pct"),
+                price_change_1m=None,
+                price_change_1m_pct=result.get("price_change_1m_pct"),
+                price_change_ytd=None,
+                volume=result.get("volume"),
+                avg_volume=result.get("avg_volume"),
+                market_cap=result.get("market_cap"),
+                pe_ratio=result.get("pe_ratio"),
+                pb_ratio=result.get("pb_ratio"),
+                dividend_yield=None,
+                fifty_two_week_high=result.get("fifty_two_week_high"),
+                fifty_two_week_low=result.get("fifty_two_week_low"),
+                rsi_14=None,
+                ma_50=None,
+                ma_200=None,
+                beta=result.get("beta"),
+                sector=result.get("sector"),
+                industry=result.get("industry"),
+            )
+
+            # 캐시 저장
+            self.cache[symbol] = (stock_data, datetime.now().timestamp())
+            logger.info(f"yfinance 데이터 조회 성공: {symbol} - {result['currency']} {result['current_price']:,.0f}")
+            return stock_data
+
+        except Exception as e:
+            logger.error(f"한국 주식 데이터 조회 실패 ({symbol}): {e}")
+            return None
+
     async def get_stock_data(self, symbol: str) -> Optional[StockData]:
         """
         종목 데이터 조회 (Finnhub API)
@@ -167,10 +376,10 @@ class StockDataService:
         # 심볼 정규화 및 마켓 판별
         resolved_symbol, market = self.resolve_stock_code(symbol)
 
-        # 한국 주식은 Finnhub에서 지원하지 않음
+        # 한국 주식은 yfinance 사용
         if market == "KR":
-            logger.warning(f"Finnhub은 한국 주식을 지원하지 않습니다: {resolved_symbol}")
-            return None
+            logger.info(f"한국 주식 데이터 조회 (yfinance): {resolved_symbol}")
+            return await self._get_kr_stock_data(resolved_symbol)
 
         # 캐시 확인
         if resolved_symbol in self.cache:

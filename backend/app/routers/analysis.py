@@ -8,7 +8,9 @@ from sqlalchemy import select, desc, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
+from app.core.config import settings
 from app.models.stock_insight import StockInsight
+from app.services.payment_service import payment_service
 from app.schemas.analysis import (
     StockAnalysisRequest,
     StockInsightResponse,
@@ -83,11 +85,35 @@ async def analyze_stock(
 
     - **stock_code**: 종목코드 또는 회사명 (예: AAPL, 삼성전자, 005930.KS)
     - **timeframe**: 투자 기간 (short, mid, long)
+    - **checkout_id**: 결제 체크아웃 ID (결제 검증용)
 
     AI 모델을 사용하여 주식 딥리서치 분석을 수행합니다.
     한국 주식과 미국 주식 모두 지원합니다.
+    결제가 설정된 경우 checkout_id로 결제 완료를 검증합니다.
+    분석 실패 시 자동으로 환불이 진행됩니다.
     """
+    checkout_id = request.checkout_id
+    payment_verified = False
+
     try:
+        # 결제 검증 (Polar가 설정된 경우)
+        if payment_service.is_configured():
+            if not checkout_id:
+                raise HTTPException(
+                    status_code=402,
+                    detail="결제가 필요합니다. 먼저 결제를 진행해주세요."
+                )
+
+            is_paid = await payment_service.verify_checkout_completed(checkout_id)
+            if not is_paid:
+                raise HTTPException(
+                    status_code=402,
+                    detail="결제가 완료되지 않았습니다."
+                )
+
+            payment_verified = True
+            logger.info(f"결제 검증 완료: {checkout_id}")
+
         from app.services.stock_insight_engine import stock_insight_engine
 
         insight = await stock_insight_engine.generate_insight(
@@ -96,10 +122,31 @@ async def analyze_stock(
         )
 
         if not insight:
-            raise HTTPException(
-                status_code=404,
-                detail=f"종목 '{request.stock_code}'을(를) 찾을 수 없거나 분석에 실패했습니다"
-            )
+            # 분석 실패 시 환불 처리
+            if payment_verified and checkout_id:
+                logger.info(f"분석 실패로 환불 처리 시작: {checkout_id}")
+                refund_success = await payment_service.refund_by_checkout_id(
+                    checkout_id=checkout_id,
+                    reason="service_disruption",
+                    comment=f"종목 '{request.stock_code}' 분석 실패 - 자동 환불"
+                )
+                if refund_success:
+                    logger.info(f"환불 완료: {checkout_id}")
+                    raise HTTPException(
+                        status_code=404,
+                        detail=f"종목 '{request.stock_code}'을(를) 찾을 수 없거나 분석에 실패했습니다. 결제가 자동으로 환불되었습니다."
+                    )
+                else:
+                    logger.error(f"환불 실패: {checkout_id}")
+                    raise HTTPException(
+                        status_code=404,
+                        detail=f"종목 '{request.stock_code}'을(를) 찾을 수 없거나 분석에 실패했습니다. 환불 처리에 문제가 발생했습니다. 고객센터로 문의해주세요."
+                    )
+            else:
+                raise HTTPException(
+                    status_code=404,
+                    detail=f"종목 '{request.stock_code}'을(를) 찾을 수 없거나 분석에 실패했습니다"
+                )
 
         logger.info(
             f"주식 분석 완료: {insight.stock_code} ({insight.stock_name}), "
@@ -117,8 +164,24 @@ async def analyze_stock(
     except HTTPException:
         raise
     except Exception as e:
+        # 예외 발생 시에도 환불 처리
+        if payment_verified and checkout_id:
+            logger.info(f"분석 중 예외 발생으로 환불 처리 시작: {checkout_id}")
+            refund_success = await payment_service.refund_by_checkout_id(
+                checkout_id=checkout_id,
+                reason="service_disruption",
+                comment=f"종목 '{request.stock_code}' 분석 중 오류 발생 - 자동 환불"
+            )
+            if refund_success:
+                logger.info(f"환불 완료: {checkout_id}")
+            else:
+                logger.error(f"환불 실패: {checkout_id}")
+
         logger.error(f"주식 분석 실패: {request.stock_code} - {str(e)}")
-        raise HTTPException(status_code=500, detail=f"분석 중 오류가 발생했습니다: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"분석 중 오류가 발생했습니다: {str(e)}. 결제는 자동으로 환불 처리됩니다."
+        )
 
 
 @router.get("/latest", response_model=StockInsightResponse)
