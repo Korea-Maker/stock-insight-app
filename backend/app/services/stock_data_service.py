@@ -220,10 +220,23 @@ class StockDataService:
     def _fetch_yfinance_sync(self, symbol: str) -> Optional[Dict[str, Any]]:
         """yfinance 동기 호출 (ThreadPoolExecutor에서 실행)"""
         try:
+            # SSL 검증 비활성화 (회사 네트워크 환경)
+            import requests
+            old_merge = requests.Session.merge_environment_settings
+            def _merge_env_settings(self, url, proxies, stream, verify, cert):
+                settings = old_merge(self, url, proxies, stream, verify, cert)
+                settings['verify'] = False
+                return settings
+            requests.Session.merge_environment_settings = _merge_env_settings
+
             ticker = yf.Ticker(symbol)
 
             # 기본 정보 - 다양한 fallback 시도
-            info = ticker.info or {}
+            try:
+                info = ticker.info or {}
+            except Exception as e:
+                logger.warning(f"yfinance info 조회 실패 ({symbol}): {e}")
+                info = {}
 
             # 현재가 조회 (여러 필드 시도)
             current_price = (
@@ -239,8 +252,8 @@ class StockDataService:
                     hist = ticker.history(period="5d")
                     if not hist.empty:
                         current_price = float(hist["Close"].iloc[-1])
-                except Exception:
-                    pass
+                except Exception as hist_err:
+                    logger.warning(f"yfinance history 조회 실패 ({symbol}): {hist_err}")
 
             if not current_price:
                 logger.warning(f"yfinance: 현재가를 찾을 수 없음 - {symbol}")
@@ -310,8 +323,119 @@ class StockDataService:
             logger.error(f"yfinance 데이터 조회 실패 ({symbol}): {e}", exc_info=True)
             return None
 
+    async def _get_kr_stock_data_pykrx_fallback(self, symbol: str) -> Optional[StockData]:
+        """
+        pykrx를 사용한 한국 주식 데이터 조회 (yfinance 실패 시 폴백)
+
+        pykrx는 실시간 데이터보다는 종목 정보와 과거 데이터에 특화되어 있음
+        """
+        try:
+            from pykrx import stock as pykrx_stock
+
+            # 심볼에서 코드 추출 (예: 086280.KS -> 086280)
+            code = symbol.replace(".KS", "").replace(".KQ", "")
+
+            # pykrx 캐시에서 종목명 조회
+            stock_name = await kr_stock_cache.get_name(code)
+            if not stock_name:
+                stock_name = code
+
+            # 최근 거래일의 OHLCV 데이터 조회 (동기 함수)
+            loop = asyncio.get_running_loop()
+
+            def fetch_pykrx_data():
+                try:
+                    # 최근 5일 데이터 조회
+                    from datetime import datetime as dt, timedelta
+                    end_date = dt.now().strftime("%Y%m%d")
+                    start_date = (dt.now() - timedelta(days=30)).strftime("%Y%m%d")
+
+                    df = pykrx_stock.get_market_ohlcv_by_date(start_date, end_date, code)
+
+                    if df.empty:
+                        return None
+
+                    # 최신 데이터
+                    latest = df.iloc[-1]
+                    current_price = float(latest["종가"])
+
+                    # 가격 변동 계산
+                    price_change_1d_pct = None
+                    price_change_1w_pct = None
+                    price_change_1m_pct = None
+
+                    if len(df) >= 2:
+                        prev_close = float(df.iloc[-2]["종가"])
+                        if prev_close > 0:
+                            price_change_1d_pct = ((current_price - prev_close) / prev_close) * 100
+
+                    if len(df) >= 6:
+                        week_ago = float(df.iloc[-6]["종가"])
+                        if week_ago > 0:
+                            price_change_1w_pct = ((current_price - week_ago) / week_ago) * 100
+
+                    if len(df) >= 2:
+                        month_ago = float(df.iloc[0]["종가"])
+                        if month_ago > 0:
+                            price_change_1m_pct = ((current_price - month_ago) / month_ago) * 100
+
+                    return {
+                        "current_price": current_price,
+                        "volume": int(latest["거래량"]) if "거래량" in latest else None,
+                        "price_change_1d_pct": price_change_1d_pct,
+                        "price_change_1w_pct": price_change_1w_pct,
+                        "price_change_1m_pct": price_change_1m_pct,
+                    }
+                except Exception as e:
+                    logger.warning(f"pykrx OHLCV 조회 실패 ({code}): {e}")
+                    return None
+
+            result = await loop.run_in_executor(self._executor, fetch_pykrx_data)
+
+            if not result:
+                logger.warning(f"pykrx 데이터도 없음: {symbol}")
+                return None
+
+            stock_data = StockData(
+                symbol=symbol,
+                name=stock_name,
+                market="KR",
+                current_price=result["current_price"],
+                currency="KRW",
+                price_change_1d=None,
+                price_change_1d_pct=result.get("price_change_1d_pct"),
+                price_change_1w=None,
+                price_change_1w_pct=result.get("price_change_1w_pct"),
+                price_change_1m=None,
+                price_change_1m_pct=result.get("price_change_1m_pct"),
+                price_change_ytd=None,
+                volume=result.get("volume"),
+                avg_volume=None,
+                market_cap=None,
+                pe_ratio=None,
+                pb_ratio=None,
+                dividend_yield=None,
+                fifty_two_week_high=None,
+                fifty_two_week_low=None,
+                rsi_14=None,
+                ma_50=None,
+                ma_200=None,
+                beta=None,
+                sector=None,
+                industry=None,
+            )
+
+            # 캐시 저장
+            self.cache[symbol] = (stock_data, datetime.now().timestamp())
+            logger.info(f"pykrx 폴백 데이터 조회 성공: {symbol} - KRW {result['current_price']:,.0f}")
+            return stock_data
+
+        except Exception as e:
+            logger.error(f"pykrx 폴백 데이터 조회 실패 ({symbol}): {e}")
+            return None
+
     async def _get_kr_stock_data(self, symbol: str) -> Optional[StockData]:
-        """한국 주식 데이터 조회 (yfinance)"""
+        """한국 주식 데이터 조회 (yfinance + pykrx 폴백)"""
         # 캐시 확인
         if symbol in self.cache:
             data, timestamp = self.cache[symbol]
@@ -320,7 +444,7 @@ class StockDataService:
                 return data
 
         try:
-            # yfinance는 동기 API이므로 ThreadPoolExecutor 사용
+            # 1차: yfinance 시도
             loop = asyncio.get_running_loop()
             result = await loop.run_in_executor(
                 self._executor,
@@ -329,8 +453,9 @@ class StockDataService:
             )
 
             if not result:
-                logger.warning(f"yfinance 데이터 없음: {symbol}")
-                return None
+                logger.warning(f"yfinance 데이터 없음, pykrx 폴백 시도: {symbol}")
+                # 2차: pykrx 폴백
+                return await self._get_kr_stock_data_pykrx_fallback(symbol)
 
             stock_data = StockData(
                 symbol=symbol,
@@ -367,8 +492,9 @@ class StockDataService:
             return stock_data
 
         except Exception as e:
-            logger.error(f"한국 주식 데이터 조회 실패 ({symbol}): {e}")
-            return None
+            logger.error(f"yfinance 조회 실패 ({symbol}): {e}, pykrx 폴백 시도")
+            # 예외 발생 시에도 pykrx 폴백 시도
+            return await self._get_kr_stock_data_pykrx_fallback(symbol)
 
     async def get_stock_data(self, symbol: str) -> Optional[StockData]:
         """

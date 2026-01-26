@@ -137,6 +137,39 @@ async def test_resolve_stock_code():
         return False
 
 
+async def test_get_stock_data():
+    """주식 데이터 조회 테스트 (yfinance + pykrx 폴백)"""
+    print("\n" + "="*60)
+    print("5. 주식 데이터 조회 테스트 (yfinance + pykrx)")
+    print("="*60)
+    try:
+        from app.services.stock_data_service import stock_data_service
+
+        test_cases = [
+            ("삼성전자", "대표 KOSPI 종목"),
+            ("086280.KS", "현대글로비스 (직접 심볼)"),
+            ("383310.KQ", "에코프로HN (KOSDAQ)"),
+        ]
+
+        for query, description in test_cases:
+            print(f"\n   테스트: {description} (입력: '{query}')")
+            data = await stock_data_service.get_stock_data(query)
+            if data:
+                print(f"   [OK] {data.name} ({data.symbol})")
+                print(f"      현재가: {data.currency} {data.current_price:,.0f}")
+                if data.price_change_1d_pct is not None:
+                    print(f"      1일 변동: {data.price_change_1d_pct:+.2f}%")
+            else:
+                print(f"   [WARN] 데이터 없음")
+
+        return True
+    except Exception as e:
+        print(f"[FAIL] 주식 데이터 조회 테스트 실패: {e}")
+        import traceback
+        traceback.print_exc()
+        return False
+
+
 async def main():
     """메인 테스트 실행"""
     print("\n" + "="*60)
@@ -156,6 +189,9 @@ async def main():
 
     # 4. 종목 코드 해석 테스트
     await test_resolve_stock_code()
+
+    # 5. 주식 데이터 조회 테스트
+    await test_get_stock_data()
 
     print("\n" + "="*60)
     print("테스트 완료!")
