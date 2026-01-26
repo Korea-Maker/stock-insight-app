@@ -11,8 +11,19 @@ import type {
   InvestmentTimeframe,
   StockSearchResult,
 } from '@/types/stock';
+import { getUserId } from '../utils/userId';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+
+/**
+ * 인증 헤더가 포함된 기본 헤더 생성
+ */
+function getHeaders(): HeadersInit {
+  return {
+    'Content-Type': 'application/json',
+    'X-User-Id': getUserId(),
+  };
+}
 
 // 결제 관련 타입
 export interface CheckoutRequest {
@@ -113,9 +124,7 @@ export async function analyzeStock(
 ): Promise<AnalysisTriggerResponse> {
   const response = await fetch(`${API_BASE_URL}/api/analysis/stock`, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
+    headers: getHeaders(),
     body: JSON.stringify({
       stock_code: stockCode,
       timeframe: timeframe,
@@ -144,9 +153,7 @@ export async function analyzeStock(
 export async function getAnalysisById(insightId: number): Promise<StockInsight> {
   const response = await fetch(`${API_BASE_URL}/api/analysis/${insightId}`, {
     method: 'GET',
-    headers: {
-      'Content-Type': 'application/json',
-    },
+    headers: getHeaders(),
   });
 
   if (!response.ok) {
@@ -173,9 +180,7 @@ export async function getLatestAnalysis(stockCode: string): Promise<StockInsight
 
   const response = await fetch(url, {
     method: 'GET',
-    headers: {
-      'Content-Type': 'application/json',
-    },
+    headers: getHeaders(),
   });
 
   if (!response.ok) {
@@ -219,9 +224,7 @@ export async function getAnalysisHistory(
 
   const response = await fetch(url, {
     method: 'GET',
-    headers: {
-      'Content-Type': 'application/json',
-    },
+    headers: getHeaders(),
   });
 
   if (!response.ok) {

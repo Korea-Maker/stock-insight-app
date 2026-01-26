@@ -2,8 +2,10 @@
 주식 딥리서치 분석 API 라우터
 AI 생성 주식 분석 결과를 조회하고 생성하는 엔드포인트 제공
 """
+import re
 import logging
-from fastapi import APIRouter, Depends, Query, HTTPException, Body
+from typing import Annotated
+from fastapi import APIRouter, Depends, Query, HTTPException, Body, Header
 from sqlalchemy import select, desc, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -28,6 +30,42 @@ from app.schemas.analysis import (
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/analysis", tags=["Stock Analysis"])
+
+# UUID v4 형식 검증 정규식
+UUID_PATTERN = re.compile(
+    r'^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$',
+    re.IGNORECASE
+)
+
+
+def get_user_id(
+    x_user_id: Annotated[str | None, Header(alias="X-User-Id")] = None
+) -> str:
+    """
+    X-User-Id 헤더에서 사용자 ID 추출 및 검증
+
+    Args:
+        x_user_id: UUID v4 형식의 사용자 식별자
+
+    Returns:
+        검증된 user_id
+
+    Raises:
+        HTTPException 400: 유효하지 않은 User ID
+    """
+    if not x_user_id:
+        raise HTTPException(
+            status_code=400,
+            detail="X-User-Id 헤더가 필요합니다"
+        )
+
+    if not UUID_PATTERN.match(x_user_id):
+        raise HTTPException(
+            status_code=400,
+            detail="유효한 UUID 형식의 User ID가 필요합니다"
+        )
+
+    return x_user_id
 
 
 def _build_response(insight: StockInsight) -> StockInsightResponse:
@@ -78,6 +116,7 @@ def _build_summary(insight: StockInsight) -> StockInsightSummary:
 @router.post("/stock", response_model=AnalysisTriggerResponse)
 async def analyze_stock(
     request: StockAnalysisRequest = Body(...),
+    user_id: str = Depends(get_user_id),
     db: AsyncSession = Depends(get_db),
 ):
     """
@@ -118,7 +157,8 @@ async def analyze_stock(
 
         insight = await stock_insight_engine.generate_insight(
             stock_code=request.stock_code,
-            timeframe=request.timeframe.value
+            timeframe=request.timeframe.value,
+            user_id=user_id
         )
 
         if not insight:
@@ -187,6 +227,7 @@ async def analyze_stock(
 @router.get("/latest", response_model=StockInsightResponse)
 async def get_latest_analysis(
     stock_code: str = Query(..., description="종목코드 (예: AAPL, 005930.KS)"),
+    user_id: str = Depends(get_user_id),
     db: AsyncSession = Depends(get_db),
 ):
     """
@@ -195,11 +236,13 @@ async def get_latest_analysis(
     - **stock_code**: 종목코드 (예: AAPL, 005930.KS)
 
     특정 종목에 대한 가장 최신 분석 결과 1개를 반환합니다.
+    사용자 본인의 분석 결과만 조회됩니다.
     """
     try:
         query = (
             select(StockInsight)
             .where(StockInsight.stock_code == stock_code)
+            .where(StockInsight.user_id == user_id)
             .order_by(desc(StockInsight.created_at))
             .limit(1)
         )
@@ -228,6 +271,7 @@ async def get_analysis_history(
     stock_code: str = Query(None, description="종목코드 필터 (없으면 전체)"),
     limit: int = Query(20, ge=1, le=100, description="가져올 항목 수 (최대 100)"),
     skip: int = Query(0, ge=0, description="건너뛸 항목 수"),
+    user_id: str = Depends(get_user_id),
     db: AsyncSession = Depends(get_db),
 ):
     """
@@ -237,12 +281,12 @@ async def get_analysis_history(
     - **limit**: 가져올 항목 수 (기본값: 20, 최대 100)
     - **skip**: 페이지네이션을 위한 건너뛸 항목 수 (기본값: 0)
 
-    분석 이력을 페이지네이션하여 반환합니다.
+    사용자 본인의 분석 이력만 페이지네이션하여 반환합니다.
     """
     try:
-        # 기본 쿼리
-        base_query = select(StockInsight)
-        count_query = select(func.count()).select_from(StockInsight)
+        # 기본 쿼리 - 사용자 필터 적용
+        base_query = select(StockInsight).where(StockInsight.user_id == user_id)
+        count_query = select(func.count()).select_from(StockInsight).where(StockInsight.user_id == user_id)
 
         # 종목코드 필터 적용
         if stock_code:
@@ -307,6 +351,7 @@ async def search_stock(
 @router.get("/{insight_id}", response_model=StockInsightResponse)
 async def get_analysis_by_id(
     insight_id: int,
+    user_id: str = Depends(get_user_id),
     db: AsyncSession = Depends(get_db),
 ):
     """
@@ -315,9 +360,13 @@ async def get_analysis_by_id(
     - **insight_id**: 분석 ID
 
     특정 분석 결과를 ID로 조회합니다.
+    사용자 본인의 분석 결과만 조회 가능합니다.
     """
     try:
-        query = select(StockInsight).where(StockInsight.id == insight_id)
+        query = select(StockInsight).where(
+            StockInsight.id == insight_id,
+            StockInsight.user_id == user_id
+        )
         result = await db.execute(query)
         insight = result.scalar_one_or_none()
 
