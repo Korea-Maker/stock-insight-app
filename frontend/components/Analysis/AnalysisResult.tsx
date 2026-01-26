@@ -2,18 +2,16 @@
 
 import { cn } from '@/lib/utils';
 import type { StockInsight } from '@/types/stock';
-import { RecommendationBadge } from './RecommendationBadge';
-import { RiskGauge } from './RiskGauge';
-import { SectionCard, KeyValueItem, TextContent } from './SectionCard';
 import {
-  FileText,
   TrendingUp,
+  TrendingDown,
+  Minus,
   AlertTriangle,
-  BarChart3,
   Brain,
   Lightbulb,
   Clock,
   Zap,
+  FileText,
 } from 'lucide-react';
 import { formatDistanceToNow, format } from 'date-fns';
 import { ko } from 'date-fns/locale';
@@ -54,12 +52,11 @@ const sentimentLabels = {
 export function AnalysisResult({ insight, className }: AnalysisResultProps) {
   const formatPrice = (price: number | undefined, market: string) => {
     if (price === undefined) return '-';
-    const currency = market === 'KR' ? 'KRW' : 'USD';
-    return new Intl.NumberFormat('ko-KR', {
-      style: 'currency',
-      currency,
-      maximumFractionDigits: market === 'KR' ? 0 : 2,
-    }).format(price);
+    const currency = market === 'KR' ? '₩' : '$';
+    const formatted = market === 'KR'
+      ? price.toLocaleString('ko-KR')
+      : price.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    return `${currency}${formatted}`;
   };
 
   const formatPercentage = (value: number | undefined | null) => {
@@ -68,227 +65,332 @@ export function AnalysisResult({ insight, className }: AnalysisResultProps) {
     return `${sign}${value.toFixed(2)}%`;
   };
 
+  const isPositive = (value: number | undefined | null) => {
+    return value !== undefined && value !== null && value >= 0;
+  };
+
+  const getRecommendationBadge = () => {
+    const rec = insight.recommendation;
+    if (rec === 'strong_buy' || rec === 'buy') {
+      return (
+        <span className="badge-success">
+          <TrendingUp className="h-4 w-4" />
+          {rec === 'strong_buy' ? 'Strong Buy' : 'Buy'}
+        </span>
+      );
+    }
+    if (rec === 'strong_sell' || rec === 'sell') {
+      return (
+        <span className="badge-error">
+          <TrendingDown className="h-4 w-4" />
+          {rec === 'strong_sell' ? 'Strong Sell' : 'Sell'}
+        </span>
+      );
+    }
+    return (
+      <span className="badge-neutral">
+        <Minus className="h-4 w-4" />
+        Hold
+      </span>
+    );
+  };
+
+  const getRiskDots = () => {
+    const dots = [];
+    for (let i = 1; i <= 10; i++) {
+      let className = "risk-dot";
+      if (i <= insight.risk_score) {
+        if (i <= 3) className += " risk-dot-active-low";
+        else if (i <= 6) className += " risk-dot-active-mid";
+        else className += " risk-dot-active-high";
+      }
+      dots.push(<div key={i} className={className} />);
+    }
+    return dots;
+  };
+
   return (
-    <div className={cn("space-y-6", className)}>
+    <div className={cn("space-y-8", className)}>
       {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 p-6 bg-gradient-to-r from-primary/5 to-primary/10 rounded-2xl border border-primary/20">
+      <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-6">
+        {/* Stock Info */}
         <div className="space-y-1">
-          <div className="flex items-center gap-2">
-            <h2 className="text-2xl font-bold">{insight.stock_name}</h2>
-            <span className="px-2 py-0.5 rounded-full bg-muted text-sm font-medium">
+          <div className="flex items-center gap-3">
+            <h2 className="text-2xl font-semibold">{insight.stock_name}</h2>
+            <span className="text-sm text-muted-foreground bg-secondary px-2 py-0.5 rounded">
               {insight.stock_code}
             </span>
           </div>
-          <div className="flex items-center gap-4 text-sm text-muted-foreground">
-            <span>{marketLabels[insight.market as keyof typeof marketLabels] || insight.market} 시장</span>
-            <span>|</span>
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <span>{marketLabels[insight.market as keyof typeof marketLabels] || insight.market}</span>
+            <span>·</span>
             <span>{timeframeLabels[insight.timeframe]}</span>
-            <span>|</span>
+            <span>·</span>
             <span
-              className="flex items-center gap-1 cursor-help"
+              className="cursor-help"
               title={formatTimeKST(insight.created_at).absolute}
             >
-              <Clock className="h-3 w-3" />
               {formatTimeKST(insight.created_at).relative}
             </span>
           </div>
         </div>
+
+        {/* Price & Recommendation */}
         <div className="flex items-center gap-6">
           <div className="text-right">
-            <div className="text-2xl font-bold">
+            <div className="text-2xl font-semibold">
               {formatPrice(insight.current_price, insight.market)}
             </div>
             {insight.price_change_1d !== undefined && (
               <div className={cn(
                 "text-sm font-medium",
-                insight.price_change_1d >= 0 ? "text-emerald-500" : "text-red-500"
+                isPositive(insight.price_change_1d) ? "text-success" : "text-error"
               )}>
-                {formatPercentage(insight.price_change_1d)} (1일)
+                {formatPercentage(insight.price_change_1d)}
               </div>
             )}
           </div>
-          <RecommendationBadge
-            recommendation={insight.recommendation}
-            confidenceLevel={insight.confidence_level}
-            size="lg"
-          />
+          {getRecommendationBadge()}
+        </div>
+      </div>
+
+      {/* Price Stats */}
+      <div className="grid grid-cols-4 gap-4 p-4 bg-secondary/50 rounded-lg">
+        <div className="stat-minimal">
+          <div className="stat-minimal-label">현재가</div>
+          <div className="text-lg font-semibold">
+            {formatPrice(insight.current_price, insight.market)}
+          </div>
+        </div>
+        <div className="stat-minimal">
+          <div className="stat-minimal-label">1일</div>
+          <div className={cn(
+            "text-lg font-semibold",
+            isPositive(insight.price_change_1d) ? "text-success" : "text-error"
+          )}>
+            {formatPercentage(insight.price_change_1d)}
+          </div>
+        </div>
+        <div className="stat-minimal">
+          <div className="stat-minimal-label">1주</div>
+          <div className={cn(
+            "text-lg font-semibold",
+            isPositive(insight.price_change_1w) ? "text-success" : "text-error"
+          )}>
+            {formatPercentage(insight.price_change_1w)}
+          </div>
+        </div>
+        <div className="stat-minimal">
+          <div className="stat-minimal-label">1개월</div>
+          <div className={cn(
+            "text-lg font-semibold",
+            isPositive(insight.price_change_1m) ? "text-success" : "text-error"
+          )}>
+            {formatPercentage(insight.price_change_1m)}
+          </div>
         </div>
       </div>
 
       {/* Key Summary */}
       {insight.key_summary && insight.key_summary.length > 0 && (
-        <SectionCard title="핵심 요약" icon={Lightbulb}>
+        <div className="space-y-4">
+          <div className="flex items-center gap-2">
+            <Lightbulb className="h-5 w-5 text-primary" />
+            <h3 className="font-semibold">핵심 포인트</h3>
+          </div>
           <ul className="space-y-2">
             {insight.key_summary.map((item, index) => (
-              <li key={index} className="flex items-start gap-2">
-                <span className="mt-1.5 h-1.5 w-1.5 rounded-full bg-primary flex-shrink-0" />
-                <span className="text-sm">{item}</span>
+              <li key={index} className="flex items-start gap-3 text-muted-foreground">
+                <span className="w-6 h-6 rounded-full bg-primary/10 text-primary text-xs font-medium flex items-center justify-center flex-shrink-0">
+                  {index + 1}
+                </span>
+                <span className="text-sm leading-relaxed">{item}</span>
               </li>
             ))}
           </ul>
-        </SectionCard>
+        </div>
       )}
 
-      {/* Main Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* 투자 의사결정 */}
-        <SectionCard title="투자 의사결정" icon={TrendingUp}>
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <RecommendationBadge
-                recommendation={insight.recommendation}
-                confidenceLevel={insight.confidence_level}
-                size="md"
-              />
-            </div>
-            <TextContent content={insight.recommendation_reason} />
-          </div>
-        </SectionCard>
+      <div className="divider" />
 
-        {/* 위험도 평가 */}
-        <SectionCard title="위험도 평가" icon={AlertTriangle}>
-          <div className="space-y-4">
-            <RiskGauge score={insight.risk_score} />
+      {/* Risk & Sentiment Grid */}
+      <div className="grid md:grid-cols-2 gap-8">
+        {/* Risk Assessment */}
+        <div className="space-y-4">
+          <div className="flex items-center gap-2">
+            <AlertTriangle className="h-5 w-5 text-primary" />
+            <h3 className="font-semibold">위험도 평가</h3>
+          </div>
+
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="risk-dots">{getRiskDots()}</div>
+              <span className="text-lg font-semibold">{insight.risk_score}/10</span>
+            </div>
+
             {insight.risk_analysis && (
-              <div className="space-y-2 pt-2">
-                <KeyValueItem label="변동성" value={insight.risk_analysis.volatility} />
-                <KeyValueItem label="회사 리스크" value={insight.risk_analysis.company_specific} />
-                <KeyValueItem label="산업 리스크" value={insight.risk_analysis.industry} />
-                <KeyValueItem label="거시경제" value={insight.risk_analysis.macro} />
+              <div className="space-y-2 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">변동성</span>
+                  <span>{insight.risk_analysis.volatility}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">회사 리스크</span>
+                  <span>{insight.risk_analysis.company_specific}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">산업 리스크</span>
+                  <span>{insight.risk_analysis.industry}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">거시경제</span>
+                  <span>{insight.risk_analysis.macro}</span>
+                </div>
               </div>
             )}
           </div>
-        </SectionCard>
+        </div>
 
-        {/* 시장 현황 */}
-        <SectionCard title="시장 현황" icon={BarChart3}>
-          <div className="space-y-2">
-            <KeyValueItem
-              label="현재가"
-              value={formatPrice(insight.current_price, insight.market)}
-            />
-            <KeyValueItem
-              label="1일 변동"
-              value={formatPercentage(insight.price_change_1d)}
-              valueClassName={insight.price_change_1d && insight.price_change_1d >= 0 ? "text-emerald-500" : "text-red-500"}
-            />
-            <KeyValueItem
-              label="1주 변동"
-              value={formatPercentage(insight.price_change_1w)}
-              valueClassName={insight.price_change_1w && insight.price_change_1w >= 0 ? "text-emerald-500" : "text-red-500"}
-            />
-            <KeyValueItem
-              label="1개월 변동"
-              value={formatPercentage(insight.price_change_1m)}
-              valueClassName={insight.price_change_1m && insight.price_change_1m >= 0 ? "text-emerald-500" : "text-red-500"}
-            />
-            {insight.market_overview && (
-              <>
-                <div className="pt-2 mt-2 border-t border-border/30">
-                  <TextContent content={insight.market_overview.price_movement} />
-                </div>
-              </>
-            )}
+        {/* Market Sentiment */}
+        <div className="space-y-4">
+          <div className="flex items-center gap-2">
+            <Brain className="h-5 w-5 text-primary" />
+            <h3 className="font-semibold">시장 심리</h3>
           </div>
-        </SectionCard>
 
-        {/* 시장 심리 */}
-        <SectionCard title="시장 심리" icon={Brain}>
-          <div className="space-y-4">
+          <div className="space-y-3">
             {insight.market_sentiment && (
-              <div className="flex items-center gap-2">
-                <span className="text-sm text-muted-foreground">전반적 심리:</span>
+              <div className="flex items-center gap-3">
                 <span className={cn(
-                  "px-2 py-1 rounded-full text-sm font-medium",
-                  insight.market_sentiment === 'bullish' && "bg-emerald-500/10 text-emerald-500",
-                  insight.market_sentiment === 'neutral' && "bg-yellow-500/10 text-yellow-500",
-                  insight.market_sentiment === 'bearish' && "bg-red-500/10 text-red-500",
+                  "px-3 py-1.5 rounded-full text-sm font-medium",
+                  insight.market_sentiment === 'bullish' && "bg-[oklch(0.95_0.05_155)] text-[oklch(0.35_0.12_155)] dark:bg-[oklch(0.25_0.08_155)] dark:text-[oklch(0.75_0.12_155)]",
+                  insight.market_sentiment === 'neutral' && "bg-secondary text-secondary-foreground",
+                  insight.market_sentiment === 'bearish' && "bg-[oklch(0.95_0.05_25)] text-[oklch(0.45_0.15_25)] dark:bg-[oklch(0.25_0.08_25)] dark:text-[oklch(0.75_0.12_25)]",
                 )}>
                   {sentimentLabels[insight.market_sentiment]}
                 </span>
+                <span className="text-sm text-muted-foreground">
+                  신뢰도: {insight.confidence_level === 'high' ? '높음' : insight.confidence_level === 'medium' ? '보통' : '낮음'}
+                </span>
               </div>
             )}
+
             {insight.sentiment_details && (
-              <div className="space-y-2">
-                <TextContent content={insight.sentiment_details.overall} />
-                <KeyValueItem label="기관 투자자" value={insight.sentiment_details.institutional} />
-                <KeyValueItem label="공매도 비율" value={insight.sentiment_details.short_interest} />
+              <div className="space-y-2 text-sm">
+                <p className="text-muted-foreground">{insight.sentiment_details.overall}</p>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">기관 투자자</span>
+                  <span>{insight.sentiment_details.institutional}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">공매도 비율</span>
+                  <span>{insight.sentiment_details.short_interest}</span>
+                </div>
               </div>
             )}
           </div>
-        </SectionCard>
+        </div>
       </div>
 
-      {/* 딥리서치 분석 */}
-      <SectionCard title="딥리서치 분석" icon={FileText}>
-        <div className="prose prose-sm dark:prose-invert max-w-none">
-          <TextContent
-            content={insight.deep_research}
-            className="text-base leading-7 whitespace-pre-wrap"
-          />
-        </div>
-      </SectionCard>
+      <div className="divider" />
 
-      {/* 변동 요인 & 미래 촉매 */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* 현재 변동 요인 */}
+      {/* Investment Decision */}
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <TrendingUp className="h-5 w-5 text-primary" />
+            <h3 className="font-semibold">투자 의사결정</h3>
+          </div>
+          {getRecommendationBadge()}
+        </div>
+        <p className="text-muted-foreground leading-relaxed">
+          {insight.recommendation_reason}
+        </p>
+      </div>
+
+      <div className="divider" />
+
+      {/* Deep Research */}
+      <div className="space-y-4">
+        <div className="flex items-center gap-2">
+          <FileText className="h-5 w-5 text-primary" />
+          <h3 className="font-semibold">딥리서치 분석</h3>
+        </div>
+        <p className="text-muted-foreground leading-relaxed whitespace-pre-wrap">
+          {insight.deep_research}
+        </p>
+      </div>
+
+      <div className="divider" />
+
+      {/* Drivers & Catalysts Grid */}
+      <div className="grid md:grid-cols-2 gap-8">
+        {/* Current Drivers */}
         {insight.current_drivers && (
-          <SectionCard title="현재 변동 요인" icon={Zap}>
-            <div className="space-y-3">
+          <div className="space-y-4">
+            <div className="flex items-center gap-2">
+              <Zap className="h-5 w-5 text-primary" />
+              <h3 className="font-semibold">현재 변동 요인</h3>
+            </div>
+            <div className="space-y-4">
               {insight.current_drivers.news_based && (
                 <div>
                   <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">뉴스 기반</span>
-                  <TextContent content={insight.current_drivers.news_based} />
+                  <p className="text-sm text-muted-foreground mt-1">{insight.current_drivers.news_based}</p>
                 </div>
               )}
               {insight.current_drivers.technical && (
                 <div>
                   <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">기술적 요인</span>
-                  <TextContent content={insight.current_drivers.technical} />
+                  <p className="text-sm text-muted-foreground mt-1">{insight.current_drivers.technical}</p>
                 </div>
               )}
               {insight.current_drivers.fundamental && (
                 <div>
                   <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">펀더멘털</span>
-                  <TextContent content={insight.current_drivers.fundamental} />
+                  <p className="text-sm text-muted-foreground mt-1">{insight.current_drivers.fundamental}</p>
                 </div>
               )}
             </div>
-          </SectionCard>
+          </div>
         )}
 
-        {/* 미래 촉매 */}
+        {/* Future Catalysts */}
         {insight.future_catalysts && (
-          <SectionCard title="미래 촉매" icon={Clock}>
-            <div className="space-y-3">
+          <div className="space-y-4">
+            <div className="flex items-center gap-2">
+              <Clock className="h-5 w-5 text-primary" />
+              <h3 className="font-semibold">미래 촉매</h3>
+            </div>
+            <div className="space-y-4">
               {insight.future_catalysts.short_term && (
                 <div>
                   <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">단기 (1-3개월)</span>
-                  <TextContent content={insight.future_catalysts.short_term} />
+                  <p className="text-sm text-muted-foreground mt-1">{insight.future_catalysts.short_term}</p>
                 </div>
               )}
               {insight.future_catalysts.mid_term && (
                 <div>
                   <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">중기 (3-12개월)</span>
-                  <TextContent content={insight.future_catalysts.mid_term} />
+                  <p className="text-sm text-muted-foreground mt-1">{insight.future_catalysts.mid_term}</p>
                 </div>
               )}
               {insight.future_catalysts.long_term && (
                 <div>
                   <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">장기 (1년+)</span>
-                  <TextContent content={insight.future_catalysts.long_term} />
+                  <p className="text-sm text-muted-foreground mt-1">{insight.future_catalysts.long_term}</p>
                 </div>
               )}
             </div>
-          </SectionCard>
+          </div>
         )}
       </div>
 
       {/* Disclaimer */}
-      <Disclaimer variant="compact" className="mt-6" />
+      <Disclaimer variant="compact" className="mt-8" />
 
-      {/* Footer Metadata */}
-      <div className="flex items-center justify-end text-xs text-muted-foreground pt-4 border-t">
+      {/* Footer */}
+      <div className="flex items-center justify-end text-xs text-muted-foreground pt-4 border-t border-border">
         <span>분석 소요 시간: {insight.processing_time_ms ? `${(insight.processing_time_ms / 1000).toFixed(1)}초` : '-'}</span>
       </div>
     </div>

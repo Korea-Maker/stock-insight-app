@@ -1,24 +1,17 @@
 import type { Metadata } from "next";
-import { Noto_Sans_KR, Outfit } from "next/font/google";
+import { Inter } from "next/font/google";
 import "./globals.css";
 import { MainLayout } from "@/components/Layout/MainLayout";
 import { ThemeProvider } from "@/components/Theme/ThemeProvider";
 
-const notoSansKr = Noto_Sans_KR({
-  variable: "--font-noto-sans-kr",
+const inter = Inter({
+  variable: "--font-geist-sans",
   subsets: ["latin"],
-  weight: ["100", "300", "400", "500", "700", "900"],
-});
-
-const outfit = Outfit({
-  variable: "--font-outfit",
-  subsets: ["latin"],
-  weight: ["100", "300", "400", "500", "700", "900"],
 });
 
 export const metadata: Metadata = {
-  title: "Stock Deep Research - AI 주식 딥리서치 분석",
-  description: "AI 기반 주식 딥리서치 분석 (한국/미국 주식 지원)",
+  title: "Stock Insight - AI 주식 분석",
+  description: "AI 기반 주식 딥리서치 분석 플랫폼",
 };
 
 export default function RootLayout({
@@ -29,9 +22,9 @@ export default function RootLayout({
   return (
     <html lang="ko" suppressHydrationWarning>
       <body
-        className={`${notoSansKr.variable} ${outfit.variable} antialiased`}
+        className={`${inter.variable} font-sans antialiased`}
       >
-        <ThemeProvider defaultTheme="system">
+        <ThemeProvider defaultTheme="light">
           <MainLayout>
             {children}
           </MainLayout>
