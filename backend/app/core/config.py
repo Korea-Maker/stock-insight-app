@@ -4,7 +4,7 @@
 """
 import os
 from pydantic_settings import BaseSettings
-from pydantic import field_validator
+from pydantic import computed_field
 from typing import List
 
 
@@ -17,24 +17,18 @@ class Settings(BaseSettings):
     ENVIRONMENT: str = "development"
 
     # CORS 설정 (allow_credentials=True와 함께 사용 시 "*" 사용 불가)
-    # 환경변수로 쉼표 구분 문자열 지원: CORS_ORIGINS=https://example.com,https://app.example.com
-    CORS_ORIGINS: List[str] = [
-        "http://localhost:3000",
-        "http://localhost:3001",
-        "http://127.0.0.1:3000",
-        "http://127.0.0.1:3001",
-    ]
+    # 환경변수로 쉼표 또는 세미콜론 구분 문자열 지원
+    # 예: CORS_ORIGINS=https://example.com;https://app.example.com
+    CORS_ORIGINS_RAW: str = "http://localhost:3000;http://localhost:3001;http://127.0.0.1:3000;http://127.0.0.1:3001"
 
-    @field_validator("CORS_ORIGINS", mode="before")
-    @classmethod
-    def parse_cors_origins(cls, v):
+    @computed_field
+    @property
+    def CORS_ORIGINS(self) -> List[str]:
         """쉼표 또는 세미콜론 구분 문자열을 리스트로 변환"""
-        if isinstance(v, str):
-            # 세미콜론 또는 쉼표로 분리 (CLI 호환성)
-            if ";" in v:
-                return [origin.strip() for origin in v.split(";") if origin.strip()]
-            return [origin.strip() for origin in v.split(",") if origin.strip()]
-        return v
+        raw = self.CORS_ORIGINS_RAW
+        if ";" in raw:
+            return [origin.strip() for origin in raw.split(";") if origin.strip()]
+        return [origin.strip() for origin in raw.split(",") if origin.strip()]
 
     # SQLite 경로 설정 (Koyeb 볼륨 마운트용)
     SQLITE_PATH: str = ""
