@@ -1,10 +1,7 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  // Cloudflare Pages 호환 설정
-  output: "standalone",
-
-  // 이미지 최적화 설정 (Cloudflare 호환)
+  // 이미지 최적화 설정
   images: {
     unoptimized: true,
   },
