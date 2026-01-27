@@ -28,8 +28,11 @@ class Settings(BaseSettings):
     @field_validator("CORS_ORIGINS", mode="before")
     @classmethod
     def parse_cors_origins(cls, v):
-        """쉼표 구분 문자열을 리스트로 변환"""
+        """쉼표 또는 세미콜론 구분 문자열을 리스트로 변환"""
         if isinstance(v, str):
+            # 세미콜론 또는 쉼표로 분리 (CLI 호환성)
+            if ";" in v:
+                return [origin.strip() for origin in v.split(";") if origin.strip()]
             return [origin.strip() for origin in v.split(",") if origin.strip()]
         return v
 
