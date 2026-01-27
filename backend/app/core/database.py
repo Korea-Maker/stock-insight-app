@@ -31,8 +31,15 @@ def get_database_url() -> str:
             f"@{settings.POSTGRES_HOST}:{settings.POSTGRES_PORT}/{settings.POSTGRES_DB}"
         )
     else:
-        # SQLite 기본 (backend/data/quantboard.db)
-        db_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "data", "quantboard.db")
+        # SQLite 경로: 환경변수 SQLITE_PATH 또는 기본 경로 사용
+        if settings.SQLITE_PATH:
+            db_path = settings.SQLITE_PATH
+        else:
+            db_path = os.path.join(
+                os.path.dirname(os.path.dirname(os.path.dirname(__file__))),
+                "data",
+                "quantboard.db"
+            )
         os.makedirs(os.path.dirname(db_path), exist_ok=True)
         return f"sqlite+aiosqlite:///{db_path}"
 
