@@ -12,6 +12,8 @@ import {
   Sparkles,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { DesignThemeSwitcher } from '@/components/Theme/DesignThemeSwitcher';
+import { ThemeToggle } from '@/components/Theme/ThemeToggle';
 
 const fadeIn = {
   hidden: { opacity: 0, y: 20 },
@@ -50,6 +52,8 @@ export default function LandingPage() {
             </nav>
 
             <div className="flex items-center gap-3">
+              <DesignThemeSwitcher />
+              <ThemeToggle />
               <Link href="/dashboard">
                 <Button className="rounded-lg">
                   시작하기

@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation';
 import { LayoutDashboard, BrainCircuit, History, Home } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ThemeToggle } from '@/components/Theme/ThemeToggle';
+import { DesignThemeSwitcher } from '@/components/Theme/DesignThemeSwitcher';
 import { motion } from 'framer-motion';
 
 interface NavItem {
@@ -98,8 +99,12 @@ export function TopNav(): React.ReactElement {
         {/* Separator */}
         <div className="h-5 w-px bg-linear-to-b from-transparent via-border/60 to-transparent hidden md:block" />
 
-        {/* Right Side - Theme Toggle */}
+        {/* Right Side - Theme Controls */}
         <div className="flex items-center gap-2">
+          {/* Design Theme Switcher */}
+          <DesignThemeSwitcher />
+
+          {/* Light/Dark Mode Toggle */}
           <div className="bg-background/40 backdrop-blur-sm rounded-full border border-white/5 hover:border-white/20 transition-colors duration-300">
             <ThemeToggle />
           </div>
