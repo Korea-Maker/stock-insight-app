@@ -135,8 +135,11 @@ async def analyze_stock(
     payment_verified = False
 
     try:
-        # 결제 검증 (Polar가 설정된 경우)
-        if payment_service.is_configured():
+        # 데모 모드 확인 (마케팅/테스트용)
+        demo_mode = settings.ENVIRONMENT == "demo"
+
+        # 결제 검증 (Polar가 설정된 경우, 데모 모드가 아닐 때만)
+        if payment_service.is_configured() and not demo_mode:
             if not checkout_id:
                 raise HTTPException(
                     status_code=402,
@@ -152,6 +155,8 @@ async def analyze_stock(
 
             payment_verified = True
             logger.info(f"결제 검증 완료: {checkout_id}")
+        elif demo_mode:
+            logger.info("데모 모드: 결제 검증 건너뜀")
 
         from app.services.stock_insight_engine import stock_insight_engine
 
