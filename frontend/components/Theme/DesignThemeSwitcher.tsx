@@ -5,6 +5,8 @@ import { cn } from '@/lib/utils';
 import { Palette, Terminal, Newspaper, Leaf, ChevronDown } from 'lucide-react';
 import { useState, useRef, useEffect } from 'react';
 
+const isDevelopment = process.env.NODE_ENV === 'development';
+
 const themes: {
   value: DesignTheme;
   icon: typeof Palette;
@@ -46,6 +48,11 @@ export function DesignThemeSwitcher() {
   const { designTheme, setDesignTheme } = useDesignTheme();
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+
+  // 프로덕션 환경에서는 렌더링하지 않음
+  if (!isDevelopment) {
+    return null;
+  }
 
   const currentTheme = themes.find(t => t.value === designTheme) ?? themes[0];
 
