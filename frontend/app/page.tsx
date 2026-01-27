@@ -118,12 +118,12 @@ export default function LandingPage() {
               {
                 icon: Brain,
                 title: "AI 딥리서치",
-                description: "GPT-4 기반의 심층 분석으로 전문가 수준의 인사이트를 제공합니다"
+                description: "고성능 AI 기반의 심층 분석으로 전문가 수준의 인사이트를 제공합니다"
               },
               {
                 icon: Clock,
                 title: "실시간 데이터",
-                description: "Finnhub API를 통해 최신 시장 데이터를 실시간으로 반영합니다"
+                description: "다수의 최신 인텔리전스를 활용해 최신 시장 데이터를 실시간으로 반영합니다"
               },
               {
                 icon: BarChart3,
