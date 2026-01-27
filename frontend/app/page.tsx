@@ -14,6 +14,8 @@ import {
 import { Button } from '@/components/ui/button';
 import { DesignThemeSwitcher } from '@/components/Theme/DesignThemeSwitcher';
 import { ThemeToggle } from '@/components/Theme/ThemeToggle';
+import { AnalysisResult } from '@/components/Analysis/AnalysisResult';
+import type { StockInsight } from '@/types/stock';
 
 const fadeIn = {
   hidden: { opacity: 0, y: 20 },
@@ -26,6 +28,63 @@ const stagger = {
       staggerChildren: 0.1
     }
   }
+};
+
+// 데모용 샘플 분석 데이터
+const demoInsight: StockInsight = {
+  id: 0,
+  stock_code: "AAPL",
+  stock_name: "Apple Inc.",
+  market: "US",
+  timeframe: "mid",
+  created_at: new Date().toISOString().slice(0, -1),
+  deep_research: `Apple은 현재 AI 혁신의 중심에 서 있습니다. iPhone 16 시리즈에 탑재된 Apple Intelligence와 M4 칩의 뛰어난 AI 연산 능력은 하드웨어-소프트웨어 통합 전략의 정점을 보여줍니다.
+
+서비스 부문이 전체 매출의 25%를 넘어서며 수익성 높은 구독 기반 비즈니스로 성공적으로 전환 중입니다. App Store, Apple Music, iCloud, Apple TV+가 안정적인 현금 흐름을 창출하고 있습니다.
+
+Vision Pro를 통한 공간 컴퓨팅 시장 진출은 장기적 성장 동력이 될 전망입니다. 초기 판매량은 제한적이나, Apple 생태계와의 연동을 통해 점진적 확산이 예상됩니다.
+
+중국 시장에서의 경쟁 심화와 반독점 규제는 단기 리스크 요인이지만, 인도 시장 확대와 제조 다변화 전략이 이를 상쇄할 것으로 분석됩니다.`,
+  recommendation: "buy",
+  confidence_level: "high",
+  recommendation_reason: "강력한 생태계, AI 혁신 리더십, 서비스 매출 성장, 안정적인 현금 흐름을 바탕으로 중기 투자에 적합합니다. 현재 밸류에이션은 프리미엄이나, 성장 잠재력을 감안하면 정당화됩니다.",
+  risk_score: 4,
+  risk_analysis: {
+    volatility: "보통",
+    company_specific: "낮음",
+    industry: "보통",
+    macro: "보통",
+    liquidity: "매우 낮음",
+    regulatory: "보통"
+  },
+  current_price: 237.59,
+  price_change_1d: 1.24,
+  price_change_1w: 3.87,
+  price_change_1m: -2.15,
+  market_sentiment: "bullish",
+  sentiment_details: {
+    overall: "기관 투자자들의 긍정적 전망이 우세하며, AI 통합 전략에 대한 기대감이 높습니다.",
+    institutional: "순매수",
+    short_interest: "1.2%"
+  },
+  key_summary: [
+    "Apple Intelligence와 M4 칩으로 AI 시대 선도",
+    "서비스 매출 25% 돌파, 고마진 구독 비즈니스 성장",
+    "Vision Pro로 공간 컴퓨팅 시장 선점",
+    "인도 시장 확대로 중국 의존도 분산"
+  ],
+  current_drivers: {
+    news_based: "iPhone 16 Pro 시리즈 판매 호조, Apple Intelligence 기능 확대 발표",
+    technical: "200일 이동평균선 상회, RSI 55 중립 구간",
+    fundamental: "서비스 부문 연간 성장률 12%, 자사주 매입 프로그램 지속"
+  },
+  future_catalysts: {
+    short_term: "2025년 1분기 실적 발표, 새로운 AI 기능 업데이트",
+    mid_term: "Vision Pro 2세대 출시, 인도 생산 시설 확대",
+    long_term: "자율주행 프로젝트 진전, AR 글래스 출시 가능성"
+  },
+  ai_model: "GPT-4o-mini",
+  processing_time_ms: 8500
 };
 
 export default function LandingPage() {
@@ -94,7 +153,7 @@ export default function LandingPage() {
           <motion.div variants={fadeIn} className="flex flex-col sm:flex-row items-center justify-center gap-4">
             <Link href="/dashboard">
               <Button size="lg" className="rounded-lg px-8 h-12 text-base">
-                무료로 시작하기
+                지금 시작하기
                 <ArrowRight className="ml-2 h-5 w-5" />
               </Button>
             </Link>
@@ -169,8 +228,29 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* How it Works */}
+      {/* Demo Report Section */}
       <section className="py-20">
+        <div className="container-wide">
+          <div className="text-center mb-12">
+            <h2 className="text-3xl font-semibold mb-4">실제 분석 리포트 예시</h2>
+            <p className="text-muted-foreground max-w-2xl mx-auto">
+              Apple(AAPL) 주식에 대한 AI 분석 결과입니다. 이와 같은 상세한 리포트를 받아보실 수 있습니다.
+            </p>
+          </div>
+
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            className="card-minimal-bordered max-w-5xl mx-auto"
+          >
+            <AnalysisResult insight={demoInsight} />
+          </motion.div>
+        </div>
+      </section>
+
+      {/* How it Works */}
+      <section className="py-20 bg-secondary/30">
         <div className="container-narrow">
           <div className="text-center mb-16">
             <h2 className="text-3xl font-semibold mb-4">간단한 3단계</h2>

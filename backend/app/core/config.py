@@ -62,7 +62,7 @@ class Settings(BaseSettings):
 
     # Polar 결제 설정
     POLAR_API_KEY: str = ""
-    POLAR_BASE_URL: str = "https://sandbox-api.polar.sh/v1"
+    POLAR_BASE_URL: str = "https://api.polar.sh/v1"
     POLAR_PRODUCT_ID: str = ""
 
     # LLM 파이프라인 설정
