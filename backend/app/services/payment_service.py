@@ -78,7 +78,7 @@ class PolarPaymentService:
             if metadata:
                 payload["metadata"] = metadata
 
-            async with httpx.AsyncClient(verify=False, timeout=30.0) as client:
+            async with httpx.AsyncClient(timeout=30.0) as client:
                 response = await client.post(
                     f"{self.base_url}/checkouts/",
                     headers=self.headers,
@@ -121,7 +121,7 @@ class PolarPaymentService:
             return None
 
         try:
-            async with httpx.AsyncClient(verify=False, timeout=30.0) as client:
+            async with httpx.AsyncClient(timeout=30.0) as client:
                 response = await client.get(
                     f"{self.base_url}/checkouts/{checkout_id}",
                     headers=self.headers,
@@ -168,7 +168,7 @@ class PolarPaymentService:
             return None
 
         try:
-            async with httpx.AsyncClient(verify=False, timeout=30.0) as client:
+            async with httpx.AsyncClient(timeout=30.0) as client:
                 # 주문 목록에서 checkout_id로 필터링
                 response = await client.get(
                     f"{self.base_url}/orders/",
@@ -224,7 +224,7 @@ class PolarPaymentService:
             if comment:
                 payload["comment"] = comment
 
-            async with httpx.AsyncClient(verify=False, timeout=30.0) as client:
+            async with httpx.AsyncClient(timeout=30.0) as client:
                 response = await client.post(
                     f"{self.base_url}/refunds/",
                     headers=self.headers,

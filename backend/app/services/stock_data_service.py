@@ -3,9 +3,7 @@
 - 미국 주식: Finnhub API
 - 한국 주식: yfinance (Yahoo Finance) + pykrx (종목 검색)
 """
-import os
 import logging
-import urllib3
 from dataclasses import dataclass
 from typing import Optional, List, Dict, Any
 from datetime import datetime, timedelta
@@ -18,9 +16,6 @@ import pandas as pd
 
 from app.core.config import settings
 from app.services.kr_stock_cache import kr_stock_cache
-
-# SSL 경고 비활성화
-urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 logger = logging.getLogger(__name__)
 
@@ -197,7 +192,7 @@ class StockDataService:
         return query.upper(), "US"
 
     async def _fetch_finnhub(self, endpoint: str, params: Dict[str, Any]) -> Optional[Dict]:
-        """Finnhub API 호출 (SSL 검증 비활성화)"""
+        """Finnhub API 호출"""
         api_key = self.api_key
         if not api_key:
             logger.error("FINNHUB_API 키가 설정되지 않았습니다. .env 파일을 확인하세요.")
@@ -206,7 +201,7 @@ class StockDataService:
         url = f"{FINNHUB_BASE_URL}/{endpoint}"
 
         try:
-            async with httpx.AsyncClient(verify=False, timeout=30.0) as client:
+            async with httpx.AsyncClient(timeout=30.0) as client:
                 response = await client.get(url, params=params)
                 response.raise_for_status()
                 return response.json()
@@ -220,15 +215,6 @@ class StockDataService:
     def _fetch_yfinance_sync(self, symbol: str) -> Optional[Dict[str, Any]]:
         """yfinance 동기 호출 (ThreadPoolExecutor에서 실행)"""
         try:
-            # SSL 검증 비활성화 (회사 네트워크 환경)
-            import requests
-            old_merge = requests.Session.merge_environment_settings
-            def _merge_env_settings(self, url, proxies, stream, verify, cert):
-                settings = old_merge(self, url, proxies, stream, verify, cert)
-                settings['verify'] = False
-                return settings
-            requests.Session.merge_environment_settings = _merge_env_settings
-
             ticker = yf.Ticker(symbol)
 
             # 기본 정보 - 다양한 fallback 시도
