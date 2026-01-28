@@ -1,0 +1,20 @@
+[bandit]
+# Directories to exclude from scanning
+exclude_dirs = tests,venv,.venv,__pycache__,.pytest_cache
+
+# Minimum severity level to report (LOW, MEDIUM, HIGH)
+severity_level = MEDIUM
+
+# Minimum confidence level to report (LOW, MEDIUM, HIGH)
+confidence_level = MEDIUM
+
+# Target directories to scan
+targets = app
+
+# Skip specific test IDs
+# B101: assert_used - asserts are fine in non-production code
+# B104: hardcoded_bind_all_interfaces - FastAPI binds 0.0.0.0 by default
+skips = B101,B104
+
+# Output format
+format = json

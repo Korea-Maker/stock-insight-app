@@ -1,0 +1,66 @@
+# Gitleaks configuration for Stock Insight App
+# https://github.com/gitleaks/gitleaks
+
+title = "Stock Insight App Gitleaks Config"
+
+[extend]
+# Use the default gitleaks config as base
+useDefault = true
+
+# Custom rules for API keys used in this project
+[[rules]]
+id = "openai-api-key"
+description = "OpenAI API Key"
+regex = '''sk-proj-[a-zA-Z0-9_-]{20,}'''
+tags = ["key", "openai"]
+
+[[rules]]
+id = "anthropic-api-key"
+description = "Anthropic API Key"
+regex = '''sk-ant-[a-zA-Z0-9_-]{20,}'''
+tags = ["key", "anthropic"]
+
+[[rules]]
+id = "finnhub-api-key"
+description = "Finnhub API Key"
+regex = '''[a-z]{2}[0-9a-z]{18}'''
+tags = ["key", "finnhub"]
+# This pattern is generic, so we add entropy check
+entropy = 3.5
+
+# Allowlist for false positives
+[allowlist]
+description = "Global allowlist"
+
+# Allow paths that commonly contain non-sensitive data
+paths = [
+    '''\.env\.example$''',
+    '''\.env\.template$''',
+    '''\.env\.sample$''',
+    '''docs/.*''',
+    '''\.md$''',
+    '''tests/.*fixtures.*''',
+    '''__pycache__/.*''',
+    '''node_modules/.*''',
+    '''\.next/.*''',
+    '''\.git/.*''',
+]
+
+# Allow specific patterns that look like secrets but aren't
+regexes = [
+    # Example/placeholder keys
+    '''sk-proj-your-api-key-here''',
+    '''sk-ant-your-api-key-here''',
+    '''your[-_]?api[-_]?key''',
+    '''<your[-_]?.*[-_]?key>''',
+    '''REPLACE[-_]?ME''',
+    '''xxx+''',
+    # Common test values
+    '''test[-_]?key''',
+    '''fake[-_]?key''',
+    '''dummy[-_]?key''',
+    '''mock[-_]?key''',
+]
+
+# Allow specific commits (use sparingly)
+# commits = []
