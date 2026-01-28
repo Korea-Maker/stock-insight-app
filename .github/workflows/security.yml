@@ -80,7 +80,7 @@ jobs:
         run: pip install bandit[toml]
 
       - name: Run Bandit
-        run: bandit -c ../.bandit -r app -f json -o bandit-report.json || true
+        run: bandit -c pyproject.toml -r app -f json -o bandit-report.json || true
 
       - name: Upload Bandit report
         uses: actions/upload-artifact@v4
@@ -91,7 +91,7 @@ jobs:
 
       - name: Check for HIGH severity issues
         run: |
-          if bandit -c ../.bandit -r app -ll -q; then
+          if bandit -c pyproject.toml -r app -ll -q; then
             echo "No HIGH severity issues found"
           else
             echo "::error::HIGH severity security issues detected!"

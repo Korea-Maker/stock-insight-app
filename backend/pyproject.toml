@@ -105,3 +105,8 @@ exclude_lines = [
 ]
 fail_under = 0
 show_missing = true
+
+[tool.bandit]
+exclude_dirs = ["tests", "venv", ".venv", "__pycache__", ".pytest_cache"]
+targets = ["app"]
+skips = ["B101", "B104"]
