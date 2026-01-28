@@ -350,6 +350,156 @@ def parse_stock_analysis_response(response_text: str) -> dict:
 
 ---
 
+## KRStockCacheService
+
+**위치:** `app/services/kr_stock_cache.py`
+
+pykrx 기반 한국 종목 캐시 서비스입니다. KOSPI/KOSDAQ 전체 종목 목록을 캐싱하고, 종목코드와 종목명 간의 매핑을 제공합니다.
+
+### 클래스 구조
+
+```python
+class KRStockCacheService:
+    def __init__(self):
+        # 종목 캐시: code -> (name, market)
+        self._code_to_info: Dict[str, tuple[str, str]] = {}
+        # 역방향 매핑: name -> code
+        self._name_to_code: Dict[str, str] = {}
+        # 캐시 TTL: 24시간
+        self._cache_ttl = timedelta(hours=24)
+```
+
+### 주요 메서드
+
+#### search
+
+한국 종목을 검색합니다.
+
+```python
+async def search(self, query: str, limit: int = 10) -> List[Dict[str, Any]]:
+    """
+    Args:
+        query: 검색어 (종목명 또는 코드)
+        limit: 최대 결과 수 (기본 10, 최대 100)
+
+    Returns:
+        검색 결과 리스트
+        [{"symbol": "005930.KS", "name": "삼성전자", "market": "KR"}]
+    """
+```
+
+**예시:**
+```python
+results = await kr_stock_cache.search("삼성")
+# [
+#   {"symbol": "005930.KS", "name": "삼성전자", "market": "KR"},
+#   {"symbol": "006400.KS", "name": "삼성SDI", "market": "KR"},
+#   ...
+# ]
+```
+
+#### get_name
+
+종목코드로 종목명을 조회합니다.
+
+```python
+async def get_name(self, code: str) -> Optional[str]:
+    """
+    Args:
+        code: 종목코드 (예: "005930", "005930.KS")
+
+    Returns:
+        종목명 또는 None
+    """
+```
+
+**예시:**
+```python
+name = await kr_stock_cache.get_name("005930")
+# "삼성전자"
+```
+
+#### resolve_code
+
+종목명/코드를 정규화된 심볼과 시장으로 변환합니다.
+
+```python
+async def resolve_code(self, query: str) -> Optional[tuple[str, str]]:
+    """
+    Args:
+        query: 종목명 또는 코드 (예: "삼성전자", "005930", "005930.KS")
+
+    Returns:
+        (symbol, market) 튜플 또는 None
+        예: ("005930.KS", "KR")
+    """
+```
+
+**예시:**
+```python
+# 종목명으로 검색
+result = await kr_stock_cache.resolve_code("삼성전자")
+# ("005930.KS", "KR")
+
+# 코드로 검색
+result = await kr_stock_cache.resolve_code("005930")
+# ("005930.KS", "KR")
+```
+
+#### is_kr_stock
+
+주어진 쿼리가 한국 종목인지 확인합니다.
+
+```python
+async def is_kr_stock(self, query: str) -> bool:
+    """
+    Args:
+        query: 종목명 또는 코드
+
+    Returns:
+        한국 종목이면 True
+    """
+```
+
+### 캐싱 전략
+
+- **TTL:** 24시간 (한국 시장은 일일 업데이트)
+- **지연 로딩:** 첫 요청 시 pykrx에서 전체 종목 로드
+- **스레드 안전:** asyncio.Lock 및 threading.Lock 사용
+- **데이터 소스:** pykrx 라이브러리 (KOSPI/KOSDAQ)
+
+### 심볼 접미사 규칙
+
+| 시장 | 접미사 | 예시 |
+|------|--------|------|
+| KOSPI | `.KS` | `005930.KS` (삼성전자) |
+| KOSDAQ | `.KQ` | `035720.KQ` (카카오) |
+
+### 싱글톤 인스턴스
+
+```python
+kr_stock_cache = KRStockCacheService()
+```
+
+### 사용 예시
+
+```python
+from app.services.kr_stock_cache import kr_stock_cache
+
+# 종목 검색
+results = await kr_stock_cache.search("카카오", limit=5)
+
+# 한국 종목 여부 확인
+is_kr = await kr_stock_cache.is_kr_stock("삼성전자")  # True
+is_kr = await kr_stock_cache.is_kr_stock("AAPL")     # False
+
+# 종목코드 정규화
+symbol, market = await kr_stock_cache.resolve_code("삼성전자")
+# symbol: "005930.KS", market: "KR"
+```
+
+---
+
 ## 서비스 의존성 다이어그램
 
 ```
@@ -365,16 +515,17 @@ def parse_stock_analysis_response(response_text: str) -> dict:
 │  │StockDataService│ │   Prompts      │  │
 │  └───────┬───────┘ └────────┬────────┘  │
 │          │                  │           │
-│          ▼                  ▼           │
-│  ┌───────────────┐ ┌─────────────────┐  │
-│  │ Finnhub API   │ │  OpenAI API    │  │
-│  │ yfinance      │ │  Anthropic API │  │
-│  └───────────────┘ └────────┬────────┘  │
-│                             │           │
-│                             ▼           │
-│                    ┌─────────────────┐  │
-│                    │ ResponseParser  │  │
-│                    └─────────────────┘  │
+│    ┌─────┴─────┐            ▼           │
+│    ▼           ▼   ┌─────────────────┐  │
+│  ┌───────┐ ┌──────┐│  OpenAI API    │  │
+│  │Finnhub│ │KRStock││  Anthropic API │  │
+│  │  API  │ │ Cache ││                │  │
+│  └───────┘ └──────┘└────────┬────────┘  │
+│              │              │           │
+│              ▼              ▼           │
+│        ┌─────────┐ ┌─────────────────┐  │
+│        │ yfinance│ │ ResponseParser  │  │
+│        └─────────┘ └─────────────────┘  │
 └─────────────────────────────────────────┘
                   │
                   ▼
