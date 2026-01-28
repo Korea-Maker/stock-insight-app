@@ -135,28 +135,26 @@ async def analyze_stock(
     payment_verified = False
 
     try:
-        # 데모 모드 확인 (마케팅/테스트용)
-        demo_mode = settings.ENVIRONMENT == "demo"
-
-        # 결제 검증 (Polar가 설정된 경우, 데모 모드가 아닐 때만)
-        if payment_service.is_configured() and not demo_mode:
-            if not checkout_id:
-                raise HTTPException(
-                    status_code=402,
-                    detail="결제가 필요합니다. 먼저 결제를 진행해주세요."
-                )
-
-            is_paid = await payment_service.verify_checkout_completed(checkout_id)
-            if not is_paid:
-                raise HTTPException(
-                    status_code=402,
-                    detail="결제가 완료되지 않았습니다."
-                )
-
-            payment_verified = True
-            logger.info(f"결제 검증 완료: {checkout_id}")
-        elif demo_mode:
-            logger.info("데모 모드: 결제 검증 건너뜀")
+        # 결제 시스템 비활성화 - 무료 분석 모드
+        # TODO: 결제 시스템 재활성화 시 아래 주석 해제
+        # demo_mode = settings.ENVIRONMENT == "demo"
+        # if payment_service.is_configured() and not demo_mode:
+        #     if not checkout_id:
+        #         raise HTTPException(
+        #             status_code=402,
+        #             detail="결제가 필요합니다. 먼저 결제를 진행해주세요."
+        #         )
+        #     is_paid = await payment_service.verify_checkout_completed(checkout_id)
+        #     if not is_paid:
+        #         raise HTTPException(
+        #             status_code=402,
+        #             detail="결제가 완료되지 않았습니다."
+        #         )
+        #     payment_verified = True
+        #     logger.info(f"결제 검증 완료: {checkout_id}")
+        # elif demo_mode:
+        #     logger.info("데모 모드: 결제 검증 건너뜀")
+        logger.info("무료 분석 모드: 결제 검증 비활성화")
 
         from app.services.stock_insight_engine import stock_insight_engine
 
