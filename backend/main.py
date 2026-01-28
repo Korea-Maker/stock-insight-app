@@ -10,8 +10,7 @@ from contextlib import asynccontextmanager
 
 from app.core.config import settings
 from app.core.database import init_db, close_db
-from app.routers import analysis
-# from app.routers import payment  # 결제 시스템 비활성화
+from app.routers import analysis, payment
 
 # 로깅 설정
 logging.basicConfig(
@@ -64,7 +63,7 @@ app.add_middleware(
 
 # 라우터 등록
 app.include_router(analysis.router)
-# app.include_router(payment.router)  # 결제 시스템 비활성화
+app.include_router(payment.router)
 
 
 @app.get("/health")
