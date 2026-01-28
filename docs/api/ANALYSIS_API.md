@@ -1,8 +1,28 @@
 # Analysis API
 
+> **최종 업데이트:** 2025-01-28
+
 주식 딥리서치 분석 API 엔드포인트 문서입니다.
 
 **Base URL:** `http://localhost:8000/api/analysis`
+
+## 인증
+
+대부분의 엔드포인트는 `X-User-Id` 헤더가 필요합니다. 자세한 내용은 [API 인증 문서](./AUTHENTICATION.md)를 참조하세요.
+
+```bash
+# 인증 헤더 예시
+curl http://localhost:8000/api/analysis/history \
+  -H "X-User-Id: 550e8400-e29b-41d4-a716-446655440000"
+```
+
+| 엔드포인트 | X-User-Id 필수 |
+|-----------|---------------|
+| `POST /stock` | **필수** |
+| `GET /latest` | **필수** |
+| `GET /history` | **필수** |
+| `GET /{insight_id}` | **필수** |
+| `GET /search/stock` | 불필요 |
 
 ## 엔드포인트 목록
 
@@ -20,8 +40,17 @@
 
 주식 딥리서치 분석을 실행합니다.
 
+**인증:** `X-User-Id` 헤더 필수
+
 ### Request
 
+**Headers:**
+```
+Content-Type: application/json
+X-User-Id: <UUID v4>
+```
+
+**Body:**
 ```json
 {
   "stock_code": "AAPL",
@@ -61,6 +90,7 @@
 ```bash
 curl -X POST http://localhost:8000/api/analysis/stock \
   -H "Content-Type: application/json" \
+  -H "X-User-Id: 550e8400-e29b-41d4-a716-446655440000" \
   -d '{"stock_code": "TSLA", "timeframe": "short"}'
 ```
 
@@ -69,6 +99,8 @@ curl -X POST http://localhost:8000/api/analysis/stock \
 ## GET /latest
 
 특정 종목의 가장 최신 분석 결과를 조회합니다.
+
+**인증:** `X-User-Id` 헤더 필수 (본인 데이터만 조회)
 
 ### Query Parameters
 
@@ -141,7 +173,8 @@ curl -X POST http://localhost:8000/api/analysis/stock \
 ### 예시
 
 ```bash
-curl "http://localhost:8000/api/analysis/latest?stock_code=AAPL"
+curl "http://localhost:8000/api/analysis/latest?stock_code=AAPL" \
+  -H "X-User-Id: 550e8400-e29b-41d4-a716-446655440000"
 ```
 
 ---
@@ -149,6 +182,8 @@ curl "http://localhost:8000/api/analysis/latest?stock_code=AAPL"
 ## GET /history
 
 분석 이력을 페이지네이션하여 조회합니다.
+
+**인증:** `X-User-Id` 헤더 필수 (본인 데이터만 조회)
 
 ### Query Parameters
 
@@ -194,13 +229,16 @@ curl "http://localhost:8000/api/analysis/latest?stock_code=AAPL"
 
 ```bash
 # 전체 이력 (최신 20개)
-curl "http://localhost:8000/api/analysis/history"
+curl "http://localhost:8000/api/analysis/history" \
+  -H "X-User-Id: 550e8400-e29b-41d4-a716-446655440000"
 
 # 특정 종목 이력
-curl "http://localhost:8000/api/analysis/history?stock_code=AAPL&limit=10"
+curl "http://localhost:8000/api/analysis/history?stock_code=AAPL&limit=10" \
+  -H "X-User-Id: 550e8400-e29b-41d4-a716-446655440000"
 
 # 페이지네이션
-curl "http://localhost:8000/api/analysis/history?skip=20&limit=20"
+curl "http://localhost:8000/api/analysis/history?skip=20&limit=20" \
+  -H "X-User-Id: 550e8400-e29b-41d4-a716-446655440000"
 ```
 
 ---
@@ -208,6 +246,8 @@ curl "http://localhost:8000/api/analysis/history?skip=20&limit=20"
 ## GET /search/stock
 
 종목을 검색합니다. 한국/미국 종목 모두 지원합니다.
+
+**인증:** 불필요 (공개 데이터)
 
 ### Query Parameters
 
@@ -256,6 +296,8 @@ curl "http://localhost:8000/api/analysis/search/stock?query=apple"
 
 특정 분석 결과를 ID로 조회합니다.
 
+**인증:** `X-User-Id` 헤더 필수 (소유권 검증)
+
 ### Path Parameters
 
 | 파라미터 | 타입 | 설명 |
@@ -275,7 +317,8 @@ curl "http://localhost:8000/api/analysis/search/stock?query=apple"
 ### 예시
 
 ```bash
-curl http://localhost:8000/api/analysis/1
+curl http://localhost:8000/api/analysis/1 \
+  -H "X-User-Id: 550e8400-e29b-41d4-a716-446655440000"
 ```
 
 ---

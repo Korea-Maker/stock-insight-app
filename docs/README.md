@@ -1,5 +1,7 @@
 # Stock Insight App 문서
 
+> **최종 업데이트:** 2025-01-28
+
 AI 기반 주식 딥리서치 분석 애플리케이션의 기술 문서입니다.
 
 ## 문서 구조
@@ -10,11 +12,13 @@ docs/
 ├── GETTING_STARTED.md           # 5분 퀵스타트 가이드
 ├── api/                         # API 문서
 │   ├── ANALYSIS_API.md          # 분석 API 엔드포인트
-│   └── PAYMENT_API.md           # 결제 API 엔드포인트
+│   ├── PAYMENT_API.md           # 결제 API 엔드포인트
+│   └── AUTHENTICATION.md        # API 인증 (X-User-Id)
 ├── architecture/                # 아키텍처 문서
 │   ├── SYSTEM_OVERVIEW.md       # 시스템 아키텍처 개요
 │   ├── AI_PIPELINE.md           # AI 분석 파이프라인
-│   └── DATA_FLOW.md             # 데이터 흐름도
+│   ├── DATA_FLOW.md             # 데이터 흐름도
+│   └── user-isolation-design.md # 사용자 격리 설계
 ├── backend/                     # 백엔드 문서
 │   ├── SERVICES.md              # 서비스 계층 상세
 │   └── MODELS.md                # 데이터 모델 정의
@@ -22,7 +26,10 @@ docs/
 │   ├── COMPONENTS.md            # 컴포넌트 구조
 │   └── STORES.md                # 상태 관리 (Zustand)
 └── guides/                      # 개발 가이드
-    └── DEVELOPMENT.md           # 로컬 개발 환경 설정
+    ├── DEVELOPMENT.md           # 로컬 개발 환경 설정
+    ├── TESTING.md               # 테스트 전략 및 작성 가이드
+    ├── DEPLOYMENT.md            # Docker 및 프로덕션 배포
+    └── TROUBLESHOOTING.md       # 에러 해결 가이드
 ```
 
 ## 빠른 링크
@@ -33,11 +40,13 @@ docs/
 ### API 레퍼런스
 - [분석 API](./api/ANALYSIS_API.md) - 주식 분석 API
 - [결제 API](./api/PAYMENT_API.md) - Polar 결제 연동
+- [API 인증](./api/AUTHENTICATION.md) - X-User-Id 헤더
 
 ### 아키텍처
 - [시스템 개요](./architecture/SYSTEM_OVERVIEW.md) - 전체 시스템 구조
 - [AI 파이프라인](./architecture/AI_PIPELINE.md) - 분석 엔진 상세
 - [데이터 흐름](./architecture/DATA_FLOW.md) - 요청-응답 플로우
+- [사용자 격리 설계](./architecture/user-isolation-design.md) - Browser UUID 기반 격리
 
 ### 코드 문서
 - [백엔드 서비스](./backend/SERVICES.md) - Python 서비스 계층
@@ -47,6 +56,9 @@ docs/
 
 ### 개발
 - [개발 가이드](./guides/DEVELOPMENT.md) - 로컬 환경 설정
+- [테스트 가이드](./guides/TESTING.md) - 테스트 전략 및 작성
+- [배포 가이드](./guides/DEPLOYMENT.md) - Docker 및 프로덕션 배포
+- [트러블슈팅](./guides/TROUBLESHOOTING.md) - 에러 해결
 
 ## 기술 스택 요약
 
