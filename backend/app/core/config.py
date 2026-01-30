@@ -60,10 +60,11 @@ class Settings(BaseSettings):
     # Finnhub API 설정 (주식 데이터)
     FINNHUB_API: str = ""
 
-    # Polar 결제 설정
-    POLAR_API_KEY: str = ""
-    POLAR_BASE_URL: str = "https://api.polar.sh/v1"
-    POLAR_PRODUCT_ID: str = ""
+    # Lemon Squeezy 결제 설정
+    LEMONSQUEEZY_API_KEY: str = ""
+    LEMONSQUEEZY_STORE_ID: str = ""
+    LEMONSQUEEZY_VARIANT_ID: str = ""
+    LEMONSQUEEZY_WEBHOOK_SECRET: str = ""
 
     # LLM 파이프라인 설정
     LLM_PRIMARY_PROVIDER: str = "openai"  # openai, anthropic, google, azure_openai

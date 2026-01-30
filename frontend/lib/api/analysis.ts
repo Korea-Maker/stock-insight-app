@@ -46,7 +46,7 @@ export interface CheckoutStatusResponse {
 }
 
 /**
- * 결제 체크아웃 세션 생성
+ * 결제 체크아웃 세션 생성 (Lemon Squeezy)
  * @param stockCode 종목코드
  * @param timeframe 투자 기간
  * @param successUrl 결제 성공 후 리다이렉트 URL
@@ -86,7 +86,7 @@ export async function createCheckout(
 }
 
 /**
- * 결제 상태 확인
+ * 결제 상태 확인 (Lemon Squeezy)
  * @param checkoutId 체크아웃 ID
  */
 export async function getCheckoutStatus(checkoutId: string): Promise<CheckoutStatusResponse> {

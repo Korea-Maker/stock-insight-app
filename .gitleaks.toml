@@ -28,6 +28,18 @@ tags = ["key", "finnhub"]
 # This pattern is generic, so we add entropy check
 entropy = 3.5
 
+[[rules]]
+id = "lemonsqueezy-api-key"
+description = "Lemon Squeezy API Key"
+regex = '''eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiJ9\.[a-zA-Z0-9_-]+\.[a-zA-Z0-9_-]+'''
+tags = ["key", "lemonsqueezy", "jwt"]
+
+[[rules]]
+id = "polar-api-key"
+description = "Polar API Key (Legacy - for history scanning)"
+regex = '''polar_oat_[a-zA-Z0-9_-]{20,}'''
+tags = ["key", "polar", "legacy"]
+
 # Allowlist for false positives
 [allowlist]
 description = "Global allowlist"
@@ -52,6 +64,12 @@ regexes = [
     '''sk-proj-your-api-key-here''',
     '''sk-ant-your-api-key-here''',
     '''your[-_]?api[-_]?key''',
+    '''your[-_]?lemonsqueezy[-_]?api[-_]?key''',
+    '''your[-_]?store[-_]?id''',
+    '''your[-_]?variant[-_]?id''',
+    '''your[-_]?webhook[-_]?secret''',
+    '''polar_oat_your-polar-api-key''',
+    '''your-polar-product-id''',
     '''<your[-_]?.*[-_]?key>''',
     '''REPLACE[-_]?ME''',
     '''xxx+''',

@@ -11,7 +11,7 @@ Stock Insight App의 FastAPI 백엔드입니다.
 - **Anthropic** Claude (Fallback)
 - **Finnhub** API (US Stocks)
 - **yfinance** (KR Stocks)
-- **Polar** (Payment)
+- **Lemon Squeezy** (Payment)
 
 ## 빠른 시작
 
@@ -46,8 +46,10 @@ FINNHUB_API=your_finnhub_api_key
 ANTHROPIC_API_KEY=sk-ant-...
 
 # 선택 (결제)
-POLAR_ACCESS_TOKEN=your_polar_token
-POLAR_PRODUCT_ID=your_product_id
+LEMONSQUEEZY_API_KEY=your_lemonsqueezy_api_key
+LEMONSQUEEZY_STORE_ID=your_store_id
+LEMONSQUEEZY_VARIANT_ID=your_variant_id
+LEMONSQUEEZY_WEBHOOK_SECRET=your_webhook_secret
 
 # 설정
 LLM_PRIMARY_PROVIDER=openai

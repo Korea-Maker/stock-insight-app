@@ -11,7 +11,7 @@ frontend/components/
 ├── services/
 │   ├── stock_insight_engine.py  # AI 분석 엔진
 │   ├── stock_data_service.py    # 주식 데이터 수집
-│   ├── payment_service.py       # Polar 결제 연동
+│   ├── payment_service.py       # Lemon Squeezy 결제 연동
 │   ├── prompts.py               # LLM 프롬프트 정의
 │   └── response_parser.py       # LLM 응답 파싱
 ```
@@ -224,7 +224,7 @@ stock_data_service = StockDataService()
 
 **위치:** `app/services/payment_service.py`
 
-Polar 결제 연동 서비스입니다.
+Lemon Squeezy 결제 연동 서비스입니다.
 
 ### 주요 메서드
 
@@ -234,7 +234,7 @@ Polar 결제 연동 서비스입니다.
 
 ```python
 def is_configured(self) -> bool:
-    """Polar 환경변수가 설정되었는지 확인"""
+    """Lemon Squeezy 환경변수가 설정되었는지 확인"""
 ```
 
 #### create_checkout_session

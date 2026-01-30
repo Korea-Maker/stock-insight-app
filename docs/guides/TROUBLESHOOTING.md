@@ -9,7 +9,7 @@ Stock Insight App 일반적인 오류 및 해결 방법입니다.
 | 상태 코드 | 에러 | 원인 | 해결 방법 |
 |-----------|------|------|----------|
 | 400 | Bad Request | 잘못된 요청 형식, X-User-Id 누락/잘못됨 | 요청 파라미터 및 헤더 확인 |
-| 402 | Payment Required | 결제가 필요한 요청 | Polar 결제 완료 후 재시도 |
+| 402 | Payment Required | 결제가 필요한 요청 | Lemon Squeezy 결제 완료 후 재시도 |
 | 404 | Not Found | 종목/분석 결과를 찾을 수 없음 | 종목코드 확인, 다른 사용자 데이터 접근 시도 |
 | 500 | Internal Server Error | 서버 내부 오류 | 로그 확인, API 키 설정 확인 |
 | 503 | Service Unavailable | 외부 API 장애 (OpenAI, Finnhub) | 잠시 후 재시도 |
@@ -244,7 +244,7 @@ Frontend에서는 `lib/utils/userId.ts`의 `getUserId()` 함수가 자동으로 
 ```
 
 **원인:**
-- Polar 결제가 설정되어 있고 무료 분석 횟수 초과
+- Lemon Squeezy 결제가 설정되어 있고 무료 분석 횟수 초과
 
 **해결:**
 - 결제 진행 후 `checkout_id` 포함하여 재요청

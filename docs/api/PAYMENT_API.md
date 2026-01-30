@@ -1,17 +1,18 @@
 # Payment API
 
-Polar 결제 연동 API 엔드포인트 문서입니다.
+Lemon Squeezy 결제 연동 API 엔드포인트 문서입니다.
 
 **Base URL:** `http://localhost:8000/api/payment`
 
-> **Note:** 결제 기능은 선택적입니다. Polar 환경 변수가 설정되지 않으면 분석 API는 무료로 동작합니다.
+> **Note:** 결제 기능은 선택적입니다. Lemon Squeezy 환경 변수가 설정되지 않으면 분석 API는 무료로 동작합니다.
 
 ## 환경 변수 설정
 
 ```bash
 # backend/.env
-POLAR_ACCESS_TOKEN=your_polar_access_token
-POLAR_PRODUCT_ID=your_product_id
+LEMONSQUEEZY_API_KEY=your_lemonsqueezy_api_key
+LEMONSQUEEZY_STORE_ID=your_store_id
+LEMONSQUEEZY_VARIANT_ID=your_variant_id
 ```
 
 ## 엔드포인트 목록
@@ -51,7 +52,7 @@ POLAR_PRODUCT_ID=your_product_id
 ```json
 {
   "checkout_id": "chk_1234567890abcdef",
-  "checkout_url": "https://checkout.polar.sh/...",
+  "checkout_url": "https://yourstorename.lemonsqueezy.com/checkout/...",
   "status": "open"
 }
 ```
@@ -102,9 +103,8 @@ curl -X POST http://localhost:8000/api/payment/checkout \
 | 값 | 설명 |
 |----|------|
 | `open` | 대기 중 |
-| `succeeded` | 결제 완료 |
-| `confirmed` | 결제 확인됨 |
-| `completed` | 완료 |
+| `paid` | 결제 완료 |
+| `refunded` | 환불 완료 |
 | `expired` | 만료됨 |
 
 ### Error Responses
@@ -169,7 +169,7 @@ curl http://localhost:8000/api/payment/checkout/chk_1234567890abcdef/verify
    │
    ▼
 3. 사용자를 checkout_url로 리다이렉트
-   → Polar 결제 페이지에서 결제 진행
+   → Lemon Squeezy 결제 페이지에서 결제 진행
    │
    ▼
 4. 결제 완료 후 success_url로 리다이렉트
@@ -201,7 +201,7 @@ curl http://localhost:8000/api/payment/checkout/chk_1234567890abcdef/verify
 
 ## 결제 없이 사용
 
-Polar 환경 변수를 설정하지 않으면:
+Lemon Squeezy 환경 변수를 설정하지 않으면:
 
 1. `POST /api/payment/checkout` → 503 에러 반환
 2. `POST /api/analysis/stock` → checkout_id 없이 바로 분석 실행 가능

@@ -48,7 +48,7 @@ Stock Insight App의 데이터 흐름 문서입니다.
     │                                                                      │
     │  async def analyze_stock(request: StockAnalysisRequest):             │
     │      │                                                               │
-    │      ├─ [결제 검증 - Polar 설정 시]                                  │
+    │      ├─ [결제 검증 - Lemon Squeezy 설정 시]                         │
     │      │                                                               │
     │      └─ insight = await stock_insight_engine.generate_insight(...)   │
     └─────────────────────────────────────────┬────────────────────────────┘
@@ -171,7 +171,7 @@ Frontend → Display cached result or show "no analysis"
 
 ## 결제 플로우
 
-Polar 결제가 설정된 경우의 흐름입니다.
+Lemon Squeezy 결제가 설정된 경우의 흐름입니다.
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────┐
@@ -190,26 +190,26 @@ Polar 결제가 설정된 경우의 흐름입니다.
                }
          ↓
     Backend → PaymentService.create_checkout_session()
-            → Polar API 호출
+            → Lemon Squeezy API 호출
          ↓
     Response → {
                  "checkout_id": "chk_xxx",
-                 "checkout_url": "https://checkout.polar.sh/...",
+                 "checkout_url": "https://yourstorename.lemonsqueezy.com/checkout/...",
                  "status": "open"
                }
 
 [2] 결제 페이지 리다이렉트
     Frontend → window.location.href = checkout_url
          ↓
-    User → Polar 결제 페이지에서 결제 진행
+    User → Lemon Squeezy 결제 페이지에서 결제 진행
          ↓
-    Polar → 결제 완료 후 success_url로 리다이렉트
+    Lemon Squeezy → 결제 완료 후 success_url로 리다이렉트
 
 [3] 결제 검증
     Frontend → GET /api/payment/checkout/{checkout_id}/verify
          ↓
     Backend → PaymentService.verify_checkout_completed()
-            → Polar API로 상태 확인
+            → Lemon Squeezy API로 상태 확인
          ↓
     Response → { "verified": true } or 402 Error
 
@@ -225,7 +225,7 @@ Polar 결제가 설정된 경우의 흐름입니다.
 
 [5] 실패 시 환불
     분석 실패 → PaymentService.refund_by_checkout_id()
-             → Polar API로 환불 처리
+             → Lemon Squeezy API로 환불 처리
              → 사용자에게 환불 완료 알림
 ```
 

@@ -1,0 +1,30 @@
+name: stock-insight-api
+type: web
+regions:
+  - was  # Washington DC (가장 가까운 US 리전)
+instance_types:
+  - free  # 무료 티어
+ports:
+  - port: 8000
+    protocol: http
+scaling:
+  min: 1
+  max: 1
+health_checks:
+  - path: /health
+    port: 8000
+env:
+  - key: ENVIRONMENT
+    value: production
+  - key: API_HOST
+    value: "0.0.0.0"
+  - key: API_PORT
+    value: "8000"
+  # 아래 환경변수는 Koyeb 대시보드에서 시크릿으로 설정
+  # - OPENAI_API_KEY
+  # - ANTHROPIC_API_KEY
+  # - FINNHUB_API
+  # - LEMONSQUEEZY_API_KEY
+  # - LEMONSQUEEZY_STORE_ID
+  # - LEMONSQUEEZY_VARIANT_ID
+  # - CORS_ORIGINS_RAW

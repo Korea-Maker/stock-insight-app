@@ -32,8 +32,9 @@ services:
       - OPENAI_API_KEY=${OPENAI_API_KEY}
       - FINNHUB_API=${FINNHUB_API}
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
-      - POLAR_ACCESS_TOKEN=${POLAR_ACCESS_TOKEN}
-      - POLAR_PRODUCT_ID=${POLAR_PRODUCT_ID}
+      - LEMONSQUEEZY_API_KEY=${LEMONSQUEEZY_API_KEY}
+      - LEMONSQUEEZY_STORE_ID=${LEMONSQUEEZY_STORE_ID}
+      - LEMONSQUEEZY_VARIANT_ID=${LEMONSQUEEZY_VARIANT_ID}
       - LLM_PRIMARY_PROVIDER=openai
       - DATABASE_URL=sqlite:///./data/stock_insights.db
     volumes:
@@ -243,8 +244,9 @@ Railway Dashboard > Variables:
 | `OPENAI_API_KEY` | OpenAI API 키 |
 | `FINNHUB_API` | Finnhub API 키 |
 | `ANTHROPIC_API_KEY` | Anthropic API 키 (선택) |
-| `POLAR_ACCESS_TOKEN` | Polar 결제 토큰 |
-| `POLAR_PRODUCT_ID` | Polar 상품 ID |
+| `LEMONSQUEEZY_API_KEY` | Lemon Squeezy API 키 |
+| `LEMONSQUEEZY_STORE_ID` | Lemon Squeezy Store ID |
+| `LEMONSQUEEZY_VARIANT_ID` | Lemon Squeezy Variant ID |
 | `LLM_PRIMARY_PROVIDER` | `openai` |
 | `CORS_ORIGINS` | `https://stockinsight.app` |
 

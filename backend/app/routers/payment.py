@@ -1,6 +1,6 @@
 """
 결제 API 라우터
-Polar를 통한 결제 체크아웃 세션 관리
+Lemon Squeezy를 통한 결제 체크아웃 세션 관리
 """
 import logging
 from fastapi import APIRouter, HTTPException, Query
@@ -97,7 +97,7 @@ async def get_checkout_status(checkout_id: str):
         )
 
     status = session.get("status", "unknown")
-    is_completed = status in ("succeeded", "confirmed", "completed")
+    is_completed = status in ("paid", "refunded")
 
     return CheckoutStatusResponse(
         checkout_id=checkout_id,

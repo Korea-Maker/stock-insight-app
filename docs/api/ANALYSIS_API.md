@@ -63,7 +63,7 @@ X-User-Id: <UUID v4>
 |------|------|------|------|
 | stock_code | string | ✅ | 종목코드 또는 회사명 (AAPL, 삼성전자, 005930.KS) |
 | timeframe | enum | ✅ | 투자 기간: `short`, `mid`, `long` |
-| checkout_id | string | ❌ | 결제 체크아웃 ID (Polar 결제 사용 시) |
+| checkout_id | string | ❌ | 결제 체크아웃 ID (Lemon Squeezy 결제 사용 시) |
 
 ### Response (200 OK)
 
@@ -81,7 +81,7 @@ X-User-Id: <UUID v4>
 
 | 상태 코드 | 설명 |
 |-----------|------|
-| 402 | 결제 필요 (Polar 설정 시) |
+| 402 | 결제 필요 (Lemon Squeezy 설정 시) |
 | 404 | 종목을 찾을 수 없음 |
 | 500 | 분석 중 오류 발생 |
 

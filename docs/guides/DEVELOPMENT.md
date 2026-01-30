@@ -62,9 +62,10 @@ FINNHUB_API=your_finnhub_api_key
 # 선택: Anthropic API 키 (폴백)
 ANTHROPIC_API_KEY=sk-ant-...
 
-# 선택: Polar 결제
-POLAR_ACCESS_TOKEN=your_polar_token
-POLAR_PRODUCT_ID=your_product_id
+# 선택: Lemon Squeezy 결제
+LEMONSQUEEZY_API_KEY=your_lemonsqueezy_api_key
+LEMONSQUEEZY_STORE_ID=your_store_id
+LEMONSQUEEZY_VARIANT_ID=your_variant_id
 
 # 설정
 LLM_PRIMARY_PROVIDER=openai

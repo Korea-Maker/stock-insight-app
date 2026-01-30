@@ -39,7 +39,7 @@ docs/
 
 ### API 레퍼런스
 - [분석 API](./api/ANALYSIS_API.md) - 주식 분석 API
-- [결제 API](./api/PAYMENT_API.md) - Polar 결제 연동
+- [결제 API](./api/PAYMENT_API.md) - Lemon Squeezy 결제 연동
 - [API 인증](./api/AUTHENTICATION.md) - X-User-Id 헤더
 
 ### 아키텍처
@@ -70,7 +70,7 @@ docs/
 | Database | SQLite |
 | AI | OpenAI GPT-4o-mini, Anthropic Claude (fallback) |
 | Stock Data | Finnhub API (US), yfinance (KR) |
-| Payment | Polar |
+| Payment | Lemon Squeezy |
 
 ## 지원 시장
 

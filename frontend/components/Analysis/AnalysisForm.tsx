@@ -33,7 +33,7 @@ export function AnalysisForm({ className }: AnalysisFormProps) {
     setError,
   } = useAnalysisStore();
 
-  // URL에서 결제 완료 파라미터 확인
+  // URL에서 결제 완료 파라미터 확인 (Lemon Squeezy 리다이렉트)
   useEffect(() => {
     const checkoutIdFromUrl = searchParams.get('checkout_id');
     const stockCodeFromUrl = searchParams.get('stock_code');
