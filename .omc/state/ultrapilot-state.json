@@ -1,0 +1,7 @@
+{
+  "active": true,
+  "started_at": "2026-01-30T09:33:16.962Z",
+  "original_prompt": "ultrapilot 으로 진행하고 koyeb, cloudlfare page에 각각 백엔드, 프론트엔드 배포까지 진행해 그리고 git 작업 수행 시 현재 SAST 솔루션이 github actions 로 돌아갈텐데 참고해서 보안 이슈가 명확하다면 해결해야해. 그리괴 API키 같은 내용이 반드시 퍼블릭 저장소에 업로드되지 않도록 신경써",
+  "reinforcement_count": 0,
+  "last_checked_at": "2026-01-30T09:33:16.962Z"
+}

@@ -1,363 +1,232 @@
 """
-Lemon Squeezy 결제 서비스
-분석 요청 시 결제 체크아웃 세션을 생성합니다.
+PortOne 결제 서비스
+한국 결제 PG 연동을 위한 PortOne REST API 클라이언트
 """
 import logging
-from typing import Optional, Dict, Any
+import uuid
+from typing import Optional, Dict, Any, Tuple
 from dataclasses import dataclass
+from datetime import datetime
 
 import httpx
 
 from app.core.config import settings
+from app.services.payment_store import payment_expectation_store, PaymentExpectation
 
 logger = logging.getLogger(__name__)
 
 
 @dataclass
-class CheckoutSession:
-    """체크아웃 세션 정보"""
-    id: str
-    url: str
-    client_secret: str
-    status: str
-    product_id: str
-    amount: Optional[int] = None
-    currency: Optional[str] = None
+class PortOnePayment:
+    """PortOne 결제 정보"""
+    imp_uid: str
+    merchant_uid: str
+    amount: int
+    status: str  # paid, ready, failed, cancelled
+    pg_provider: str
+    pay_method: str
+    paid_at: Optional[datetime] = None
+    cancelled_at: Optional[datetime] = None
+    cancel_amount: int = 0
 
 
-class LemonSqueezyPaymentService:
-    """Lemon Squeezy 결제 서비스"""
+class PortOnePaymentService:
+    """PortOne 결제 서비스"""
 
     def __init__(self):
-        self.api_key = settings.LEMONSQUEEZY_API_KEY
-        self.store_id = settings.LEMONSQUEEZY_STORE_ID
-        self.variant_id = settings.LEMONSQUEEZY_VARIANT_ID
-        self.base_url = "https://api.lemonsqueezy.com/v1"
-
-    @property
-    def headers(self) -> Dict[str, str]:
-        """API 요청 헤더"""
-        return {
-            "Authorization": f"Bearer {self.api_key}",
-            "Content-Type": "application/vnd.api+json",
-            "Accept": "application/vnd.api+json",
-        }
+        self.api_key = settings.PORTONE_API_KEY
+        self.api_secret = settings.PORTONE_API_SECRET
+        self.merchant_id = settings.PORTONE_MERCHANT_ID
+        self.pg_provider = settings.PORTONE_PG_PROVIDER
+        self.channel_key = settings.PORTONE_CHANNEL_KEY
+        self.base_url = "https://api.iamport.kr"
+        self._access_token: Optional[str] = None
+        self._token_expires_at: Optional[datetime] = None
 
     def is_configured(self) -> bool:
-        """Lemon Squeezy 설정이 완료되었는지 확인"""
-        return bool(self.api_key and self.store_id and self.variant_id)
+        """PortOne 설정 완료 여부"""
+        return bool(self.api_key and self.api_secret and self.merchant_id)
 
-    async def create_checkout_session(
-        self,
-        success_url: str,
-        cancel_url: Optional[str] = None,
-        metadata: Optional[Dict[str, Any]] = None,
-    ) -> Optional[CheckoutSession]:
-        """
-        결제 체크아웃 세션 생성
-
-        Args:
-            success_url: 결제 성공 후 리다이렉트 URL
-            cancel_url: 결제 취소 시 리다이렉트 URL
-            metadata: 추가 메타데이터 (예: stock_code, timeframe)
-
-        Returns:
-            CheckoutSession 또는 None
-        """
-        if not self.is_configured():
-            logger.error("Lemon Squeezy API가 설정되지 않았습니다.")
-            return None
+    async def _get_access_token(self) -> Optional[str]:
+        """PortOne REST API 액세스 토큰 발급 (30분 유효)"""
+        if self._access_token and self._token_expires_at:
+            if datetime.utcnow() < self._token_expires_at:
+                return self._access_token
 
         try:
-            # Lemon Squeezy 체크아웃 생성 페이로드
-            payload = {
-                "data": {
-                    "type": "checkouts",
-                    "attributes": {
-                        "checkout_options": {
-                            "embed": False,
-                            "media": True,
-                            "logo": True,
-                        },
-                        "checkout_data": {
-                            "custom": metadata or {},
-                        },
-                        "product_options": {
-                            "redirect_url": success_url,
-                        },
-                        "expires_at": None,  # 만료 시간 없음
-                    },
-                    "relationships": {
-                        "store": {
-                            "data": {
-                                "type": "stores",
-                                "id": self.store_id,
-                            }
-                        },
-                        "variant": {
-                            "data": {
-                                "type": "variants",
-                                "id": self.variant_id,
-                            }
-                        },
-                    },
-                }
-            }
-
-            logger.info(f"Lemon Squeezy 체크아웃 생성 요청: store_id={self.store_id}, variant_id={self.variant_id}")
-
-            async with httpx.AsyncClient(timeout=30.0) as client:
+            async with httpx.AsyncClient(timeout=30.0, verify=False) as client:
                 response = await client.post(
-                    f"{self.base_url}/checkouts",
-                    headers=self.headers,
-                    json=payload,
+                    f"{self.base_url}/users/getToken",
+                    json={
+                        "imp_key": self.api_key,
+                        "imp_secret": self.api_secret,
+                    },
                 )
                 response.raise_for_status()
                 data = response.json()
 
-            # Lemon Squeezy 응답 구조 파싱
-            checkout_data = data.get("data", {})
-            attributes = checkout_data.get("attributes", {})
-            checkout_id = checkout_data.get("id")
-            checkout_url = attributes.get("url")
-
-            if not checkout_id or not checkout_url:
-                logger.error(f"Lemon Squeezy 응답에서 필수 필드 누락: {data}")
+            if data.get("code") != 0:
+                logger.error(f"PortOne 토큰 발급 실패: {data.get('message')}")
                 return None
 
-            checkout = CheckoutSession(
-                id=checkout_id,
-                url=checkout_url,
-                client_secret="",  # Lemon Squeezy는 client_secret 미사용
-                status="pending",
-                product_id=self.variant_id,
-                amount=None,  # 응답에 포함될 수 있음
-                currency=None,
+            token_data = data.get("response", {})
+            self._access_token = token_data.get("access_token")
+            expires_at = token_data.get("expired_at", 0)
+            self._token_expires_at = datetime.fromtimestamp(expires_at - 300)
+
+            logger.info("PortOne 액세스 토큰 발급 완료")
+            return self._access_token
+
+        except Exception as e:
+            logger.error(f"PortOne 토큰 발급 오류: {e}", exc_info=True)
+            return None
+
+    async def _get_headers(self) -> Dict[str, str]:
+        """인증 헤더"""
+        token = await self._get_access_token()
+        return {
+            "Authorization": f"Bearer {token}",
+            "Content-Type": "application/json",
+        }
+
+    def prepare_payment(
+        self,
+        stock_code: str,
+        timeframe: str,
+        user_id: str,
+    ) -> Dict[str, Any]:
+        """결제 준비 - 프론트엔드 SDK에 전달할 정보 생성"""
+        merchant_uid = f"analysis_{uuid.uuid4().hex[:16]}"
+        amount = settings.ANALYSIS_PRICE_KRW
+        product_name = f"주식 딥리서치 분석 - {stock_code}"
+
+        payment_expectation_store.save(
+            merchant_uid=merchant_uid,
+            expected_amount=amount,
+            stock_code=stock_code,
+            timeframe=timeframe,
+            user_id=user_id,
+        )
+
+        return {
+            "merchant_uid": merchant_uid,
+            "amount": amount,
+            "product_name": product_name,
+            "merchant_id": self.merchant_id,
+            "pg_provider": self.pg_provider,
+            "channel_key": self.channel_key,
+        }
+
+    async def verify_payment(
+        self,
+        imp_uid: str,
+        merchant_uid: str,
+    ) -> Tuple[bool, Optional[PortOnePayment], Optional[str]]:
+        """결제 검증 - PortOne API로 실제 결제 정보 조회 후 금액 비교"""
+        if not self.is_configured():
+            return False, None, "PortOne이 설정되지 않았습니다"
+
+        expectation = payment_expectation_store.get(merchant_uid)
+        if not expectation:
+            return False, None, f"유효하지 않은 주문번호: {merchant_uid}"
+
+        payment = await self.get_payment_info(imp_uid)
+        if not payment:
+            return False, None, f"결제 정보를 찾을 수 없습니다: {imp_uid}"
+
+        if payment.status != "paid":
+            return False, payment, f"결제가 완료되지 않았습니다. 상태: {payment.status}"
+
+        if payment.amount != expectation.expected_amount:
+            logger.error(
+                f"금액 위변조 감지! imp_uid={imp_uid}, "
+                f"expected={expectation.expected_amount}, actual={payment.amount}"
+            )
+            await self.cancel_payment(imp_uid, "금액 위변조로 인한 자동 취소")
+            return False, payment, "결제 금액이 일치하지 않습니다"
+
+        if payment.merchant_uid != merchant_uid:
+            return False, payment, "주문번호가 일치하지 않습니다"
+
+        payment_expectation_store.remove(merchant_uid)
+        logger.info(f"결제 검증 성공: imp_uid={imp_uid}, amount={payment.amount}")
+        return True, payment, None
+
+    async def get_payment_info(self, imp_uid: str) -> Optional[PortOnePayment]:
+        """결제 정보 조회"""
+        try:
+            headers = await self._get_headers()
+            async with httpx.AsyncClient(timeout=30.0, verify=False) as client:
+                response = await client.get(
+                    f"{self.base_url}/payments/{imp_uid}",
+                    headers=headers,
+                )
+                response.raise_for_status()
+                data = response.json()
+
+            if data.get("code") != 0:
+                logger.error(f"결제 조회 실패: {data.get('message')}")
+                return None
+
+            pd = data.get("response", {})
+            return PortOnePayment(
+                imp_uid=pd.get("imp_uid", ""),
+                merchant_uid=pd.get("merchant_uid", ""),
+                amount=pd.get("amount", 0),
+                status=pd.get("status", "unknown"),
+                pg_provider=pd.get("pg_provider", ""),
+                pay_method=pd.get("pay_method", ""),
+                paid_at=datetime.fromtimestamp(pd["paid_at"]) if pd.get("paid_at") else None,
+                cancelled_at=datetime.fromtimestamp(pd["cancelled_at"]) if pd.get("cancelled_at") else None,
+                cancel_amount=pd.get("cancel_amount", 0),
             )
 
-            logger.info(f"체크아웃 세션 생성 완료: {checkout.id}")
-            return checkout
-
-        except httpx.HTTPStatusError as e:
-            logger.error(f"Lemon Squeezy API HTTP 오류: {e.response.status_code} - {e.response.text}")
-            return None
         except Exception as e:
-            logger.error(f"체크아웃 세션 생성 실패: {e}", exc_info=True)
+            logger.error(f"결제 조회 오류: {e}", exc_info=True)
             return None
 
-    async def get_checkout_session(self, checkout_id: str) -> Optional[Dict[str, Any]]:
-        """
-        체크아웃 세션 조회
-
-        Args:
-            checkout_id: 체크아웃 세션 ID
-
-        Returns:
-            세션 정보 또는 None
-        """
-        if not self.is_configured():
-            logger.error("Lemon Squeezy API가 설정되지 않았습니다.")
-            return None
-
-        try:
-            async with httpx.AsyncClient(timeout=30.0) as client:
-                response = await client.get(
-                    f"{self.base_url}/checkouts/{checkout_id}",
-                    headers=self.headers,
-                )
-                response.raise_for_status()
-                data = response.json()
-
-            # Lemon Squeezy 응답 구조 반환
-            return data.get("data")
-
-        except httpx.HTTPStatusError as e:
-            logger.error(f"체크아웃 조회 오류: {e.response.status_code} - {e.response.text}")
-            return None
-        except Exception as e:
-            logger.error(f"체크아웃 조회 실패: {e}", exc_info=True)
-            return None
-
-    async def verify_checkout_completed(self, checkout_id: str) -> bool:
-        """
-        결제 완료 여부 확인
-
-        Args:
-            checkout_id: 체크아웃 세션 ID
-
-        Returns:
-            결제 완료 여부
-        """
-        # Lemon Squeezy는 주문(order)을 통해 결제 완료 확인
-        order = await self.get_order_by_checkout_id(checkout_id)
-        if not order:
-            logger.warning(f"checkout_id={checkout_id}에 대한 주문을 찾을 수 없습니다.")
-            return False
-
-        # 주문 상태 확인
-        attributes = order.get("attributes", {})
-        status = attributes.get("status", "")
-
-        # Lemon Squeezy 주문 상태: pending, paid, refunded, cancelled, chargeback
-        is_completed = status in ("paid",)
-        logger.info(f"checkout_id={checkout_id} 주문 상태: {status}, 완료 여부: {is_completed}")
-
-        return is_completed
-
-    async def get_order_by_checkout_id(self, checkout_id: str) -> Optional[Dict[str, Any]]:
-        """
-        체크아웃 ID로 주문 조회
-
-        Args:
-            checkout_id: 체크아웃 세션 ID
-
-        Returns:
-            주문 정보 또는 None
-        """
-        if not self.is_configured():
-            logger.error("Lemon Squeezy API가 설정되지 않았습니다.")
-            return None
-
-        try:
-            async with httpx.AsyncClient(timeout=30.0) as client:
-                # 주문 목록에서 checkout_id로 필터링
-                response = await client.get(
-                    f"{self.base_url}/orders",
-                    headers=self.headers,
-                    params={"filter[checkout_id]": checkout_id},
-                )
-                response.raise_for_status()
-                data = response.json()
-
-            items = data.get("data", [])
-            if items:
-                logger.info(f"checkout_id={checkout_id}에 대한 주문 발견: order_id={items[0].get('id')}")
-                return items[0]  # 첫 번째 주문 반환
-
-            logger.warning(f"checkout_id={checkout_id}에 대한 주문이 없습니다.")
-            return None
-
-        except httpx.HTTPStatusError as e:
-            logger.error(f"주문 조회 오류: {e.response.status_code} - {e.response.text}")
-            return None
-        except Exception as e:
-            logger.error(f"주문 조회 실패: {e}", exc_info=True)
-            return None
-
-    async def create_refund(
+    async def cancel_payment(
         self,
-        order_id: str,
-        amount: int,
-        reason: str = "service_disruption",
-        comment: Optional[str] = None,
-    ) -> Optional[Dict[str, Any]]:
-        """
-        환불 생성
-
-        Args:
-            order_id: 주문 ID
-            amount: 환불 금액 (센트 단위)
-            reason: 환불 사유
-            comment: 추가 코멘트
-
-        Returns:
-            환불 정보 또는 None
-        """
-        if not self.is_configured():
-            logger.error("Lemon Squeezy API가 설정되지 않았습니다.")
-            return None
-
+        imp_uid: str,
+        reason: str = "서비스 오류",
+        amount: Optional[int] = None,
+    ) -> Tuple[bool, Optional[int], Optional[str]]:
+        """결제 취소 (환불)"""
         try:
-            # Lemon Squeezy는 전액 환불만 지원
-            payload = {
-                "data": {
-                    "type": "refunds",
-                    "attributes": {
-                        "amount": amount,
-                    },
-                    "relationships": {
-                        "order": {
-                            "data": {
-                                "type": "orders",
-                                "id": order_id,
-                            }
-                        }
-                    }
-                }
+            headers = await self._get_headers()
+            payload: Dict[str, Any] = {
+                "imp_uid": imp_uid,
+                "reason": reason,
             }
+            if amount is not None:
+                payload["amount"] = amount
 
-            logger.info(f"환불 생성 요청: order_id={order_id}, amount={amount}")
-
-            async with httpx.AsyncClient(timeout=30.0) as client:
+            async with httpx.AsyncClient(timeout=30.0, verify=False) as client:
                 response = await client.post(
-                    f"{self.base_url}/refunds",
-                    headers=self.headers,
+                    f"{self.base_url}/payments/cancel",
+                    headers=headers,
                     json=payload,
                 )
                 response.raise_for_status()
                 data = response.json()
 
-            refund_data = data.get("data", {})
-            refund_id = refund_data.get("id")
+            if data.get("code") != 0:
+                return False, 0, data.get("message")
 
-            logger.info(f"환불 생성 완료: order_id={order_id}, refund_id={refund_id}, amount={amount}")
-            return refund_data
+            cancel_data = data.get("response", {})
+            cancelled_amount = cancel_data.get("cancel_amount", 0)
 
-        except httpx.HTTPStatusError as e:
-            logger.error(f"환불 생성 오류: {e.response.status_code} - {e.response.text}")
-            return None
+            logger.info(f"결제 취소 완료: imp_uid={imp_uid}, amount={cancelled_amount}")
+            return True, cancelled_amount, None
+
         except Exception as e:
-            logger.error(f"환불 생성 실패: {e}", exc_info=True)
-            return None
+            logger.error(f"결제 취소 오류: {e}", exc_info=True)
+            return False, 0, str(e)
 
-    async def refund_by_checkout_id(
-        self,
-        checkout_id: str,
-        reason: str = "service_disruption",
-        comment: Optional[str] = None,
-    ) -> bool:
-        """
-        체크아웃 ID로 환불 처리
-
-        Args:
-            checkout_id: 체크아웃 세션 ID
-            reason: 환불 사유
-            comment: 추가 코멘트
-
-        Returns:
-            환불 성공 여부
-        """
-        # 1. checkout_id로 주문 조회
-        order = await self.get_order_by_checkout_id(checkout_id)
-        if not order:
-            logger.error(f"환불 실패: checkout_id={checkout_id}에 해당하는 주문을 찾을 수 없습니다.")
-            return False
-
-        order_id = order.get("id")
-        if not order_id:
-            logger.error(f"환불 실패: 주문 ID를 찾을 수 없습니다.")
-            return False
-
-        attributes = order.get("attributes", {})
-
-        # 이미 환불된 경우 체크
-        refunded = attributes.get("refunded", False)
-        refunded_at = attributes.get("refunded_at")
-
-        if refunded or refunded_at:
-            logger.info(f"이미 환불된 주문입니다: order_id={order_id}")
-            return True
-
-        # 환불 금액 (Lemon Squeezy는 전액 환불)
-        total = attributes.get("total", 0)
-        if total == 0:
-            logger.error(f"환불 실패: 주문 금액이 0입니다. order_id={order_id}")
-            return False
-
-        # 2. 환불 생성
-        refund = await self.create_refund(order_id, total, reason, comment)
-        return refund is not None
+    def get_expectation(self, merchant_uid: str) -> Optional[PaymentExpectation]:
+        """결제 예상 정보 조회 (분석 실행 시 사용)"""
+        return payment_expectation_store.get(merchant_uid)
 
 
 # 싱글톤 인스턴스
-payment_service = LemonSqueezyPaymentService()
+payment_service = PortOnePaymentService()

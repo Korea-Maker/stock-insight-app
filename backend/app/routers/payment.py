@@ -1,125 +1,163 @@
 """
 결제 API 라우터
-Lemon Squeezy를 통한 결제 체크아웃 세션 관리
+PortOne 결제 연동
 """
 import logging
-from fastapi import APIRouter, HTTPException, Query
-from pydantic import BaseModel
-from typing import Optional
+from fastapi import APIRouter, HTTPException, Header
+from typing import Annotated
 
 from app.services.payment_service import payment_service
+from app.schemas.payment import (
+    PreparePaymentRequest,
+    PreparePaymentResponse,
+    VerifyPaymentRequest,
+    VerifyPaymentResponse,
+    PaymentInfoResponse,
+    CancelPaymentRequest,
+    CancelPaymentResponse,
+    PaymentStatus,
+)
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/payment", tags=["Payment"])
 
 
-class CheckoutRequest(BaseModel):
-    """체크아웃 요청"""
-    stock_code: str
-    timeframe: str
-    success_url: str
-    cancel_url: Optional[str] = None
+def get_user_id(
+    x_user_id: Annotated[str | None, Header(alias="X-User-Id")] = None
+) -> str:
+    """X-User-Id 헤더에서 사용자 ID 추출"""
+    return x_user_id or "anonymous"
 
 
-class CheckoutResponse(BaseModel):
-    """체크아웃 응답"""
-    checkout_id: str
-    checkout_url: str
-    status: str
-
-
-class CheckoutStatusResponse(BaseModel):
-    """체크아웃 상태 응답"""
-    checkout_id: str
-    status: str
-    is_completed: bool
-
-
-@router.post("/checkout", response_model=CheckoutResponse)
-async def create_checkout(request: CheckoutRequest):
+@router.post("/prepare", response_model=PreparePaymentResponse)
+async def prepare_payment(
+    request: PreparePaymentRequest,
+    x_user_id: Annotated[str | None, Header(alias="X-User-Id")] = None,
+):
     """
-    결제 체크아웃 세션 생성
+    결제 준비
 
-    분석 요청 전에 결제 세션을 생성합니다.
-    - **stock_code**: 분석할 종목코드
-    - **timeframe**: 투자 기간 (short, mid, long)
-    - **success_url**: 결제 성공 후 리다이렉트 URL
-    - **cancel_url**: 결제 취소 시 리다이렉트 URL (선택)
+    프론트엔드 SDK에서 결제창을 띄우기 전에 호출합니다.
+    서버에서 예상 금액을 저장하고, SDK 초기화에 필요한 정보를 반환합니다.
     """
     if not payment_service.is_configured():
         raise HTTPException(
             status_code=503,
-            detail="결제 서비스가 설정되지 않았습니다."
+            detail="결제 서비스가 설정되지 않았습니다"
         )
 
-    # 메타데이터에 분석 정보 포함
-    metadata = {
-        "stock_code": request.stock_code,
-        "timeframe": request.timeframe,
+    try:
+        user_id = x_user_id or "anonymous"
+        result = payment_service.prepare_payment(
+            stock_code=request.stock_code,
+            timeframe=request.timeframe,
+            user_id=user_id,
+        )
+
+        logger.info(f"결제 준비: merchant_uid={result['merchant_uid']}, stock={request.stock_code}")
+
+        return PreparePaymentResponse(
+            merchant_uid=result["merchant_uid"],
+            amount=result["amount"],
+            product_name=result["product_name"],
+            merchant_id=result["merchant_id"],
+            pg_provider=result["pg_provider"],
+            channel_key=result.get("channel_key"),
+        )
+
+    except Exception as e:
+        logger.error(f"결제 준비 실패: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="결제 준비 중 오류가 발생했습니다")
+
+
+@router.post("/verify", response_model=VerifyPaymentResponse)
+async def verify_payment(request: VerifyPaymentRequest):
+    """
+    결제 검증
+
+    프론트엔드 SDK 콜백 후 호출합니다.
+    PortOne API로 실제 결제 정보를 조회하여 금액을 검증합니다.
+    """
+    if not payment_service.is_configured():
+        raise HTTPException(
+            status_code=503,
+            detail="결제 서비스가 설정되지 않았습니다"
+        )
+
+    success, payment, error = await payment_service.verify_payment(
+        imp_uid=request.imp_uid,
+        merchant_uid=request.merchant_uid,
+    )
+
+    if not success:
+        raise HTTPException(status_code=402, detail=error or "결제 검증 실패")
+
+    return VerifyPaymentResponse(
+        verified=True,
+        imp_uid=payment.imp_uid,
+        merchant_uid=payment.merchant_uid,
+        amount=payment.amount,
+        status=PaymentStatus.PAID,
+        paid_at=payment.paid_at,
+    )
+
+
+@router.get("/{imp_uid}", response_model=PaymentInfoResponse)
+async def get_payment_info(imp_uid: str):
+    """결제 정보 조회"""
+    if not payment_service.is_configured():
+        raise HTTPException(
+            status_code=503,
+            detail="결제 서비스가 설정되지 않았습니다"
+        )
+
+    payment = await payment_service.get_payment_info(imp_uid)
+
+    if not payment:
+        raise HTTPException(status_code=404, detail="결제 정보를 찾을 수 없습니다")
+
+    # Map status string to enum
+    status_map = {
+        "paid": PaymentStatus.PAID,
+        "ready": PaymentStatus.PENDING,
+        "failed": PaymentStatus.FAILED,
+        "cancelled": PaymentStatus.CANCELLED,
     }
 
-    checkout = await payment_service.create_checkout_session(
-        success_url=request.success_url,
-        cancel_url=request.cancel_url,
-        metadata=metadata,
-    )
-
-    if not checkout:
-        raise HTTPException(
-            status_code=500,
-            detail="결제 세션 생성에 실패했습니다."
-        )
-
-    logger.info(f"체크아웃 생성: {checkout.id} for {request.stock_code}")
-
-    return CheckoutResponse(
-        checkout_id=checkout.id,
-        checkout_url=checkout.url,
-        status=checkout.status,
+    return PaymentInfoResponse(
+        imp_uid=payment.imp_uid,
+        merchant_uid=payment.merchant_uid,
+        amount=payment.amount,
+        status=status_map.get(payment.status, PaymentStatus.PENDING),
+        pg_provider=payment.pg_provider,
+        pay_method=payment.pay_method,
+        paid_at=payment.paid_at,
+        cancelled_at=payment.cancelled_at,
     )
 
 
-@router.get("/checkout/{checkout_id}/status", response_model=CheckoutStatusResponse)
-async def get_checkout_status(checkout_id: str):
-    """
-    체크아웃 상태 조회
-
-    결제 완료 여부를 확인합니다.
-    - **checkout_id**: 체크아웃 세션 ID
-    """
-    session = await payment_service.get_checkout_session(checkout_id)
-
-    if not session:
+@router.post("/cancel", response_model=CancelPaymentResponse)
+async def cancel_payment(request: CancelPaymentRequest):
+    """결제 취소 (환불)"""
+    if not payment_service.is_configured():
         raise HTTPException(
-            status_code=404,
-            detail="체크아웃 세션을 찾을 수 없습니다."
+            status_code=503,
+            detail="결제 서비스가 설정되지 않았습니다"
         )
 
-    status = session.get("status", "unknown")
-    is_completed = status in ("paid", "refunded")
-
-    return CheckoutStatusResponse(
-        checkout_id=checkout_id,
-        status=status,
-        is_completed=is_completed,
+    success, cancelled_amount, error = await payment_service.cancel_payment(
+        imp_uid=request.imp_uid,
+        reason=request.reason,
+        amount=request.amount,
     )
 
+    if not success:
+        raise HTTPException(status_code=400, detail=error or "결제 취소 실패")
 
-@router.get("/checkout/{checkout_id}/verify")
-async def verify_payment(checkout_id: str):
-    """
-    결제 완료 검증
-
-    분석 실행 전 결제 완료를 검증합니다.
-    - **checkout_id**: 체크아웃 세션 ID
-    """
-    is_completed = await payment_service.verify_checkout_completed(checkout_id)
-
-    if not is_completed:
-        raise HTTPException(
-            status_code=402,
-            detail="결제가 완료되지 않았습니다."
-        )
-
-    return {"verified": True, "checkout_id": checkout_id}
+    return CancelPaymentResponse(
+        success=True,
+        imp_uid=request.imp_uid,
+        cancelled_amount=cancelled_amount or 0,
+        message="환불이 완료되었습니다",
+    )

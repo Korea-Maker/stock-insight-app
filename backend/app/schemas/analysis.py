@@ -43,7 +43,7 @@ class StockAnalysisRequest(BaseModel):
     """주식 분석 요청"""
     stock_code: str = Field(..., description="종목코드 또는 회사명 (예: AAPL, 삼성전자, 005930.KS)")
     timeframe: InvestmentTimeframe = Field(..., description="투자 기간 (short, mid, long)")
-    checkout_id: Optional[str] = Field(None, description="결제 체크아웃 ID (결제 검증용)")
+    merchant_uid: Optional[str] = Field(None, description="PortOne 주문 고유번호 (결제 검증용)")
 
 
 # Response Sub-Schemas

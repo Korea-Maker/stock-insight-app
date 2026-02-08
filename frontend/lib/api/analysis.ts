@@ -25,102 +25,16 @@ function getHeaders(): HeadersInit {
   };
 }
 
-// 결제 관련 타입
-export interface CheckoutRequest {
-  stock_code: string;
-  timeframe: string;
-  success_url: string;
-  cancel_url?: string;
-}
-
-export interface CheckoutResponse {
-  checkout_id: string;
-  checkout_url: string;
-  status: string;
-}
-
-export interface CheckoutStatusResponse {
-  checkout_id: string;
-  status: string;
-  is_completed: boolean;
-}
-
-/**
- * 결제 체크아웃 세션 생성 (Lemon Squeezy)
- * @param stockCode 종목코드
- * @param timeframe 투자 기간
- * @param successUrl 결제 성공 후 리다이렉트 URL
- * @param cancelUrl 결제 취소 시 리다이렉트 URL
- */
-export async function createCheckout(
-  stockCode: string,
-  timeframe: string,
-  successUrl: string,
-  cancelUrl?: string
-): Promise<CheckoutResponse> {
-  const response = await fetch(`${API_BASE_URL}/api/payment/checkout`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      stock_code: stockCode,
-      timeframe: timeframe,
-      success_url: successUrl,
-      cancel_url: cancelUrl,
-    } as CheckoutRequest),
-  });
-
-  if (!response.ok) {
-    let errorMessage = '결제 세션 생성 중 오류가 발생했습니다';
-    try {
-      const errorData = await response.json();
-      errorMessage = errorData.detail || errorMessage;
-    } catch {
-      // JSON 파싱 실패 시 기본 메시지 사용
-    }
-    throw new Error(errorMessage);
-  }
-
-  return response.json();
-}
-
-/**
- * 결제 상태 확인 (Lemon Squeezy)
- * @param checkoutId 체크아웃 ID
- */
-export async function getCheckoutStatus(checkoutId: string): Promise<CheckoutStatusResponse> {
-  const response = await fetch(`${API_BASE_URL}/api/payment/checkout/${checkoutId}/status`, {
-    method: 'GET',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-  });
-
-  if (!response.ok) {
-    let errorMessage = '결제 상태 확인 중 오류가 발생했습니다';
-    try {
-      const errorData = await response.json();
-      errorMessage = errorData.detail || errorMessage;
-    } catch {
-      // JSON 파싱 실패 시 기본 메시지 사용
-    }
-    throw new Error(errorMessage);
-  }
-
-  return response.json();
-}
-
 /**
  * 주식 딥리서치 분석 실행
  * @param stockCode 종목코드 또는 회사명
  * @param timeframe 투자 기간
- * @param checkoutId 결제 체크아웃 ID (선택적)
+ * @param merchantUid 결제 주문 ID (선택적, PortOne)
  */
 export async function analyzeStock(
   stockCode: string,
   timeframe: InvestmentTimeframe,
-  checkoutId?: string
+  merchantUid?: string
 ): Promise<AnalysisTriggerResponse> {
   const response = await fetch(`${API_BASE_URL}/api/analysis/stock`, {
     method: 'POST',
@@ -128,7 +42,7 @@ export async function analyzeStock(
     body: JSON.stringify({
       stock_code: stockCode,
       timeframe: timeframe,
-      checkout_id: checkoutId,
+      merchant_uid: merchantUid,
     }),
   });
 

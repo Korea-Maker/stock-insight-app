@@ -60,11 +60,13 @@ class Settings(BaseSettings):
     # Finnhub API 설정 (주식 데이터)
     FINNHUB_API: str = ""
 
-    # Lemon Squeezy 결제 설정
-    LEMONSQUEEZY_API_KEY: str = ""
-    LEMONSQUEEZY_STORE_ID: str = ""
-    LEMONSQUEEZY_VARIANT_ID: str = ""
-    LEMONSQUEEZY_WEBHOOK_SECRET: str = ""
+    # PortOne 결제 설정
+    PORTONE_API_KEY: str = ""
+    PORTONE_API_SECRET: str = ""
+    PORTONE_MERCHANT_ID: str = ""
+    PORTONE_PG_PROVIDER: str = "tosspayments"
+    PORTONE_CHANNEL_KEY: str = ""
+    ANALYSIS_PRICE_KRW: int = 3900
 
     # LLM 파이프라인 설정
     LLM_PRIMARY_PROVIDER: str = "openai"  # openai, anthropic, google, azure_openai

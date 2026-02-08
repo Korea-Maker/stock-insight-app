@@ -1,12 +1,13 @@
 "use client";
 
 import { useState, useCallback, useEffect } from 'react';
-import { useSearchParams, useRouter } from 'next/navigation';
-import { Loader2, ArrowRight } from 'lucide-react';
+import { Loader2, ArrowRight, CreditCard } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { StockInput, TimeframePicker } from '@/components/Stock';
 import { useAnalysisStore } from '@/store/useAnalysisStore';
-import { analyzeStock, getAnalysisById, createCheckout, getCheckoutStatus } from '@/lib/api/analysis';
+import { analyzeStock, getAnalysisById } from '@/lib/api/analysis';
+import { preparePayment, verifyPayment } from '@/lib/api/payment';
+import { loadPortOneSDK, initPortOne, requestPayment, getPgString } from '@/lib/portone/sdk';
 import type { InvestmentTimeframe } from '@/types/stock';
 import { cn } from '@/lib/utils';
 
@@ -15,63 +16,27 @@ interface AnalysisFormProps {
 }
 
 export function AnalysisForm({ className }: AnalysisFormProps) {
-  const router = useRouter();
-  const searchParams = useSearchParams();
-
   const {
     stockCode,
     timeframe,
     isAnalyzing,
-    isCheckingOut,
-    checkoutId,
+    isPaying,
     setStockCode,
     setTimeframe,
     setIsAnalyzing,
-    setIsCheckingOut,
-    setCheckoutId,
+    setIsPaying,
+    setMerchantUid,
+    setImpUid,
     setCurrentInsight,
     setError,
   } = useAnalysisStore();
 
-  // URL에서 결제 완료 파라미터 확인 (Lemon Squeezy 리다이렉트)
+  // Preload PortOne SDK on component mount
   useEffect(() => {
-    const checkoutIdFromUrl = searchParams.get('checkout_id');
-    const stockCodeFromUrl = searchParams.get('stock_code');
-    const timeframeFromUrl = searchParams.get('timeframe') as InvestmentTimeframe | null;
-
-    if (checkoutIdFromUrl && stockCodeFromUrl && timeframeFromUrl) {
-      handleAnalysisAfterPayment(checkoutIdFromUrl, stockCodeFromUrl, timeframeFromUrl);
-      router.replace('/dashboard', { scroll: false });
-    }
-  }, [searchParams]);
-
-  const handleAnalysisAfterPayment = async (
-    paidCheckoutId: string,
-    paidStockCode: string,
-    paidTimeframe: InvestmentTimeframe
-  ) => {
-    setStockCode(paidStockCode);
-    setTimeframe(paidTimeframe);
-    setError(null);
-    setIsAnalyzing(true);
-
-    try {
-      const status = await getCheckoutStatus(paidCheckoutId);
-      if (!status.is_completed) {
-        setError('결제가 완료되지 않았습니다.');
-        return;
-      }
-
-      const result = await analyzeStock(paidStockCode, paidTimeframe, paidCheckoutId);
-      const insight = await getAnalysisById(result.insight_id);
-      setCurrentInsight(insight);
-      setCheckoutId(null);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : '분석 중 오류가 발생했습니다.');
-    } finally {
-      setIsAnalyzing(false);
-    }
-  };
+    loadPortOneSDK().catch((err) => {
+      console.warn('PortOne SDK 사전 로드 실패:', err);
+    });
+  }, []);
 
   const handleSubmit = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
@@ -82,26 +47,73 @@ export function AnalysisForm({ className }: AnalysisFormProps) {
     }
 
     setError(null);
-    setIsCheckingOut(true);
+    setIsPaying(true);
 
     try {
-      const currentUrl = typeof window !== 'undefined' ? window.location.origin : '';
-      const successUrl = `${currentUrl}/dashboard?checkout_id={CHECKOUT_ID}&stock_code=${encodeURIComponent(stockCode.trim())}&timeframe=${timeframe}`;
-      const cancelUrl = `${currentUrl}/dashboard`;
+      // Step 1: Prepare payment - get SDK params from backend
+      const paymentData = await preparePayment(stockCode.trim(), timeframe);
+      setMerchantUid(paymentData.merchant_uid);
 
-      const checkout = await createCheckout(stockCode.trim(), timeframe, successUrl, cancelUrl);
-      setCheckoutId(checkout.checkout_id);
-      window.location.href = checkout.checkout_url;
+      // Step 2: Load and initialize SDK
+      await loadPortOneSDK();
+      initPortOne(paymentData.merchant_id);
+
+      // Step 3: Request payment via inline modal
+      const pgString = getPgString(paymentData.pg_provider, paymentData.channel_key);
+      const paymentResponse = await requestPayment({
+        pg: pgString,
+        pay_method: 'card',
+        merchant_uid: paymentData.merchant_uid,
+        name: paymentData.product_name,
+        amount: paymentData.amount,
+      });
+
+      if (!paymentResponse.success) {
+        // User cancelled or payment failed
+        const errorMsg = paymentResponse.error_msg || '결제가 취소되었습니다.';
+        setError(errorMsg);
+        setIsPaying(false);
+        setMerchantUid(null);
+        return;
+      }
+
+      // Step 4: Verify payment with backend
+      setImpUid(paymentResponse.imp_uid || null);
+      const verifyResponse = await verifyPayment(
+        paymentResponse.imp_uid!,
+        paymentData.merchant_uid
+      );
+
+      if (!verifyResponse.verified || verifyResponse.status !== 'paid') {
+        setError('결제 검증에 실패했습니다. 고객센터에 문의해주세요.');
+        setIsPaying(false);
+        return;
+      }
+
+      // Step 5: Payment verified - run analysis
+      setIsPaying(false);
+      setIsAnalyzing(true);
+
+      const result = await analyzeStock(stockCode.trim(), timeframe, paymentData.merchant_uid);
+      const insight = await getAnalysisById(result.insight_id);
+      setCurrentInsight(insight);
+
+      // Clear payment state
+      setMerchantUid(null);
+      setImpUid(null);
     } catch (err) {
+      // Check if payment service is not configured (fallback to direct analysis)
       if (err instanceof Error && err.message.includes('결제 서비스가 설정되지 않았습니다')) {
-        setIsCheckingOut(false);
+        setIsPaying(false);
         await handleDirectAnalysis();
       } else {
         setError(err instanceof Error ? err.message : '오류가 발생했습니다.');
-        setIsCheckingOut(false);
+        setIsPaying(false);
       }
+    } finally {
+      setIsAnalyzing(false);
     }
-  }, [stockCode, timeframe, setIsCheckingOut, setCheckoutId, setError]);
+  }, [stockCode, timeframe, setIsPaying, setMerchantUid, setImpUid, setIsAnalyzing, setCurrentInsight, setError]);
 
   const handleDirectAnalysis = async () => {
     setIsAnalyzing(true);
@@ -118,7 +130,7 @@ export function AnalysisForm({ className }: AnalysisFormProps) {
     }
   };
 
-  const isLoading = isAnalyzing || isCheckingOut;
+  const isLoading = isAnalyzing || isPaying;
 
   return (
     <form onSubmit={handleSubmit} className={cn("space-y-6", className)}>
@@ -148,10 +160,10 @@ export function AnalysisForm({ className }: AnalysisFormProps) {
         disabled={isLoading || !stockCode.trim()}
         className="w-full h-12 rounded-lg text-base"
       >
-        {isCheckingOut ? (
+        {isPaying ? (
           <>
-            <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-            결제 처리 중...
+            <CreditCard className="mr-2 h-5 w-5" />
+            결제 진행 중...
           </>
         ) : isAnalyzing ? (
           <>
@@ -167,7 +179,7 @@ export function AnalysisForm({ className }: AnalysisFormProps) {
       </Button>
 
       <p className="text-xs text-muted-foreground text-center">
-        분석 1회당 결제 · 실패 시 자동 환불
+        분석 1회당 3,900원 · 실패 시 자동 환불
       </p>
     </form>
   );

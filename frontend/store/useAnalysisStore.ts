@@ -19,7 +19,9 @@ interface AnalysisState {
   historyTotal: number;
 
   // 결제 상태
-  checkoutId: string | null;
+  merchantUid: string | null;
+  impUid: string | null;
+  isPaying: boolean;
   isCheckingOut: boolean;
 
   // Actions
@@ -29,7 +31,9 @@ interface AnalysisState {
   setCurrentInsight: (insight: StockInsight | null) => void;
   setError: (error: string | null) => void;
   setHistory: (history: StockInsightSummary[], total: number) => void;
-  setCheckoutId: (checkoutId: string | null) => void;
+  setMerchantUid: (merchantUid: string | null) => void;
+  setImpUid: (impUid: string | null) => void;
+  setIsPaying: (isPaying: boolean) => void;
   setIsCheckingOut: (isCheckingOut: boolean) => void;
   reset: () => void;
 }
@@ -42,7 +46,9 @@ const initialState = {
   timeframe: 'mid' as InvestmentTimeframe,
   history: [],
   historyTotal: 0,
-  checkoutId: null,
+  merchantUid: null,
+  impUid: null,
+  isPaying: false,
   isCheckingOut: false,
 };
 
@@ -55,7 +61,9 @@ export const useAnalysisStore = create<AnalysisState>((set) => ({
   setCurrentInsight: (insight) => set({ currentInsight: insight }),
   setError: (error) => set({ error }),
   setHistory: (history, total) => set({ history, historyTotal: total }),
-  setCheckoutId: (checkoutId) => set({ checkoutId }),
+  setMerchantUid: (merchantUid) => set({ merchantUid }),
+  setImpUid: (impUid) => set({ impUid }),
+  setIsPaying: (isPaying) => set({ isPaying }),
   setIsCheckingOut: (isCheckingOut) => set({ isCheckingOut }),
   reset: () => set(initialState),
 }));

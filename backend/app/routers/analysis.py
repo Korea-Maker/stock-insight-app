@@ -124,37 +124,37 @@ async def analyze_stock(
 
     - **stock_code**: 종목코드 또는 회사명 (예: AAPL, 삼성전자, 005930.KS)
     - **timeframe**: 투자 기간 (short, mid, long)
-    - **checkout_id**: 결제 체크아웃 ID (결제 검증용)
+    - **merchant_uid**: PortOne 주문 고유번호 (결제 검증용)
 
     AI 모델을 사용하여 주식 딥리서치 분석을 수행합니다.
     한국 주식과 미국 주식 모두 지원합니다.
-    결제가 설정된 경우 checkout_id로 결제 완료를 검증합니다.
+    결제가 설정된 경우 merchant_uid로 결제 완료를 검증합니다.
     분석 실패 시 자동으로 환불이 진행됩니다.
     """
-    checkout_id = request.checkout_id
+    merchant_uid = request.merchant_uid
     payment_verified = False
 
     try:
         # 데모 모드 확인 (마케팅/테스트용)
         demo_mode = settings.ENVIRONMENT == "demo"
 
-        # 결제 검증 (Polar가 설정된 경우, 데모 모드가 아닐 때만)
+        # 결제 검증 (PortOne이 설정된 경우, 데모 모드가 아닐 때만)
         if payment_service.is_configured() and not demo_mode:
-            if not checkout_id:
+            if not merchant_uid:
                 raise HTTPException(
                     status_code=402,
                     detail="결제가 필요합니다. 먼저 결제를 진행해주세요."
                 )
 
-            is_paid = await payment_service.verify_checkout_completed(checkout_id)
-            if not is_paid:
+            expectation = payment_service.get_expectation(merchant_uid)
+            if not expectation or expectation.expected_amount is None:
                 raise HTTPException(
                     status_code=402,
-                    detail="결제가 완료되지 않았습니다."
+                    detail="결제 정보를 찾을 수 없습니다."
                 )
 
             payment_verified = True
-            logger.info(f"결제 검증 완료: {checkout_id}")
+            logger.info(f"결제 검증 완료: {merchant_uid}")
         elif demo_mode:
             logger.info("데모 모드: 결제 검증 건너뜀")
 
@@ -167,26 +167,13 @@ async def analyze_stock(
         )
 
         if not insight:
-            # 분석 실패 시 환불 처리
-            if payment_verified and checkout_id:
-                logger.info(f"분석 실패로 환불 처리 시작: {checkout_id}")
-                refund_success = await payment_service.refund_by_checkout_id(
-                    checkout_id=checkout_id,
-                    reason="service_disruption",
-                    comment=f"종목 '{request.stock_code}' 분석 실패 - 자동 환불"
+            # 분석 실패 (환불은 수동 처리 필요)
+            if payment_verified and merchant_uid:
+                logger.error(f"분석 실패 - 수동 환불 필요: {merchant_uid}, 종목: {request.stock_code}")
+                raise HTTPException(
+                    status_code=404,
+                    detail=f"종목 '{request.stock_code}'을(를) 찾을 수 없거나 분석에 실패했습니다. 환불은 고객센터로 문의해주세요."
                 )
-                if refund_success:
-                    logger.info(f"환불 완료: {checkout_id}")
-                    raise HTTPException(
-                        status_code=404,
-                        detail=f"종목 '{request.stock_code}'을(를) 찾을 수 없거나 분석에 실패했습니다. 결제가 자동으로 환불되었습니다."
-                    )
-                else:
-                    logger.error(f"환불 실패: {checkout_id}")
-                    raise HTTPException(
-                        status_code=404,
-                        detail=f"종목 '{request.stock_code}'을(를) 찾을 수 없거나 분석에 실패했습니다. 환불 처리에 문제가 발생했습니다. 고객센터로 문의해주세요."
-                    )
             else:
                 raise HTTPException(
                     status_code=404,
@@ -209,23 +196,14 @@ async def analyze_stock(
     except HTTPException:
         raise
     except Exception as e:
-        # 예외 발생 시에도 환불 처리
-        if payment_verified and checkout_id:
-            logger.info(f"분석 중 예외 발생으로 환불 처리 시작: {checkout_id}")
-            refund_success = await payment_service.refund_by_checkout_id(
-                checkout_id=checkout_id,
-                reason="service_disruption",
-                comment=f"종목 '{request.stock_code}' 분석 중 오류 발생 - 자동 환불"
-            )
-            if refund_success:
-                logger.info(f"환불 완료: {checkout_id}")
-            else:
-                logger.error(f"환불 실패: {checkout_id}")
+        # 예외 발생 시 로깅 (환불은 수동 처리)
+        if payment_verified and merchant_uid:
+            logger.error(f"분석 중 예외 발생 - 수동 환불 필요: {merchant_uid}, 종목: {request.stock_code}, 오류: {str(e)}")
 
         logger.error(f"주식 분석 실패: {request.stock_code} - {str(e)}")
         raise HTTPException(
             status_code=500,
-            detail=f"분석 중 오류가 발생했습니다: {str(e)}. 결제는 자동으로 환불 처리됩니다."
+            detail=f"분석 중 오류가 발생했습니다: {str(e)}. 환불은 고객센터로 문의해주세요."
         )
 
 
